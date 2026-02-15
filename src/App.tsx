@@ -25,6 +25,7 @@ const App: React.FC = () => {
     };
   });
 
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
@@ -73,6 +74,7 @@ const App: React.FC = () => {
     const numDays = type === '2Q' ? 28 : 42;
     if (confirm(`Passer en mode ${type} (${numDays} jours) ? Les données actuelles seront régénérées.`)) {
       setPeriodType(type);
+      setSelectedWeekIndex(0);
       setData({
         ...data,
         days: generateEmptyPeriod(data.cycleStartDate, numDays)
@@ -276,7 +278,7 @@ const App: React.FC = () => {
             flexDirection: 'column',
             gap: '0.5rem'
           }}>
-            {[0, 1, 2, 3].map(weekIdx => {
+            {Array.from({ length: periodType === '2Q' ? 4 : 6 }).map((_, weekIdx) => {
               const weekDays = data.days.slice(weekIdx * 7, (weekIdx * 7) + 7);
               const weekTTE = weekDays
                 .reduce((acc, d, idx) => {
@@ -284,28 +286,26 @@ const App: React.FC = () => {
                   return acc + (dayRes?.tte || 0);
                 }, 0);
 
-              const today = new Date();
-              const currentWeekIndex = data.days.findIndex(d => {
-                const dayDate = new Date(d.date);
-                return dayDate >= today;
-              });
-              const isCurrent = currentWeekIndex >= 0 && Math.floor(currentWeekIndex / 7) === weekIdx;
+              const isActive = selectedWeekIndex === weekIdx;
 
               return (
                 <div
                   key={weekIdx}
+                  onClick={() => setSelectedWeekIndex(weekIdx)}
                   style={{
-                    background: isCurrent ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.05)',
+                    background: isActive ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.05)',
                     padding: '0.5rem',
                     borderRadius: 'var(--radius-md)',
-                    border: isCurrent ? '2px solid var(--accent-color)' : '1px solid var(--border)',
+                    border: isActive ? '2px solid var(--accent-color)' : '1px solid var(--border)',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
                   }}
                 >
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>S{weekIdx + 1}</div>
-                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: isCurrent ? 'var(--accent-color)' : 'white' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: isActive ? 'var(--accent-color)' : 'white' }}>
                     {formatDuration(weekTTE)}
                   </div>
                 </div>
@@ -325,19 +325,13 @@ const App: React.FC = () => {
             alignItems: 'center'
           }}>
             <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Semaine en cours</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Semaine sélectionnée</div>
               <div style={{ fontWeight: 900, fontSize: '1.5rem', color: 'white' }}>
                 {(() => {
-                  const today = new Date();
-                  const currentWeekIndex = data.days.findIndex(d => {
-                    const dayDate = new Date(d.date);
-                    return dayDate >= today;
-                  });
-                  const weekIdx = currentWeekIndex >= 0 ? Math.floor(currentWeekIndex / 7) : 0;
-                  const weekDays = data.days.slice(weekIdx * 7, (weekIdx * 7) + 7);
+                  const weekDays = data.days.slice(selectedWeekIndex * 7, (selectedWeekIndex * 7) + 7);
                   const weekTTE = weekDays
                     .reduce((acc, d, idx) => {
-                      const dayRes = result.dailyResults[(weekIdx * 7) + idx];
+                      const dayRes = result.dailyResults[(selectedWeekIndex * 7) + idx];
                       return acc + (dayRes?.tte || 0);
                     }, 0);
                   return formatDuration(weekTTE);
@@ -353,14 +347,7 @@ const App: React.FC = () => {
               fontWeight: 900,
               fontSize: '1.8rem'
             }}>
-              S{(() => {
-                const today = new Date();
-                const currentWeekIndex = data.days.findIndex(d => {
-                  const dayDate = new Date(d.date);
-                  return dayDate >= today;
-                });
-                return currentWeekIndex >= 0 ? Math.floor(currentWeekIndex / 7) + 1 : 1;
-              })()}
+              S{selectedWeekIndex + 1}
             </div>
           </div>
         </div>
