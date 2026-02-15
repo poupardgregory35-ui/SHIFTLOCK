@@ -125,7 +125,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ambupay_planning_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `shiftlock_planning_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -212,7 +212,13 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <header style={{ flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.5rem' }}>
+      <header style={{ flexDirection: 'column', gap: '1rem', padding: '1.5rem 1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', marginBottom: '0.5rem' }}>
+          <img src="/logo.png" alt="SHIFTLOCK" style={{ height: '40px', marginBottom: '4px' }} />
+          <div style={{ fontSize: '0.7rem', color: 'rgba(251, 146, 60, 0.9)', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            Ta semaine, en un coup d'œil
+          </div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
