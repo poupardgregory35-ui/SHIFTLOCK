@@ -10,7 +10,6 @@ export interface DayShift {
     hasSundayBonus: boolean;
     hasMealAllowance: boolean; // Indemnité Repas
     hasIRU: boolean; // IRU
-    isLocked: boolean;
 }
 
 export interface FortnightData {
