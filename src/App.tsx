@@ -200,15 +200,23 @@ const App: React.FC = () => {
             cursor: 'pointer'
           }}
         >
-          <video
-            autoPlay
-            muted
-            playsInline
-            style={{ width: '80%', maxWidth: '500px', height: 'auto', objectFit: 'contain' }}
-            onEnded={skipSplash}
-          >
-            <source src="/intro.mp4" type="video/mp4" />
-          </video>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', animation: 'scaleUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+            <img src="/logo.png" alt="SHIFTLOCK" style={{ width: '180px', height: 'auto' }} />
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 900,
+              letterSpacing: '0.2em',
+              color: 'white',
+              textTransform: 'uppercase',
+              background: 'var(--accent-gradient)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              opacity: 0,
+              animation: 'fadeIn 0.5s ease-out 0.5s forwards'
+            }}>
+              Pilotage Paie
+            </div>
+          </div>
         </div>
       )}
 
