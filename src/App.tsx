@@ -540,13 +540,24 @@ const App: React.FC = () => {
           <div className="card fade-in" style={{ background: 'var(--bg-accent)', borderColor: 'var(--accent-color)' }}>
             <h2 style={{ color: 'white', marginBottom: '1.25rem' }}>Paramètres & Outils</h2>
 
-            <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <img src="/logo.png" style={{ height: '24px' }} alt="SL" />
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.8 }}>SHIFTLOCK</span>
-              </div>
-              <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0 }}>
-                Version 2026.1 - Mode Immersif Actif
+            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+              <label style={{ color: 'white', fontSize: '0.8rem', marginBottom: '0.5rem', display: 'block' }}>Date de Début du Cycle (Lundi)</label>
+              <input
+                type="date"
+                value={data.cycleStartDate}
+                onChange={(e) => handleCycleStartChange(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '0.9rem',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'white'
+                }}
+              />
+              <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.5rem', margin: 0 }}>
+                {periodType === '2Q' ? 'Période de 28 jours (4 semaines)' : 'Période de 42 jours (6 semaines)'}
               </p>
             </div>
 
