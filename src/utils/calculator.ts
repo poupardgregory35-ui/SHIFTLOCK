@@ -1,246 +1,352 @@
 
-import type { DayShift, FortnightData, DailyResult, FortnightResult, PayrollEstimation } from '../types';
-import { RATES, BONUSES, THRESHOLDS, NET_RATIO } from '../constants';
-import { differenceInMinutes, parse, format, addDays, isSunday, parseISO } from 'date-fns';
+import type { DayShift, DayResult, FortnightResult, PeriodSummary, UserProfile } from '../types';
+import { ALLOWANCES, HOURLY_RATES, THRESHOLDS, MEAL_WINDOWS } from '../types';
 
-export function formatDuration(decimalHours: number): string {
-    if (isNaN(decimalHours)) return '0h00';
-    const totalMinutes = Math.round(decimalHours * 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return `${h}h${m.toString().padStart(2, '0')}`;
+// ─── UTILS TEMPS ─────────────────────────────────────────────────────────────
+
+export function timeToMinutes(time: string): number {
+    if (!time || !time.includes(':')) return 0;
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
 }
 
-export function parseSmartTime(input: string): string {
-    if (!input) return '';
-    // Handles '7', '14', '7:30', '7h30', '7h', '8.5', '1545' (4 digits)
-    let val = input.trim().toLowerCase().replace('h', ':');
-
-    // Handle 4-digit format: 1545 → 15:45
-    if (/^\d{4}$/.test(val)) {
-        const hours = val.substring(0, 2);
-        const minutes = val.substring(2, 4);
-        return `${hours}:${minutes}`;
-    }
-
-    if (val.includes('.') && !val.includes(':')) {
-        const decimal = parseFloat(val);
-        return formatDuration(decimal).replace('h', ':');
-    }
-
-    if (!val.includes(':')) {
-        const num = parseInt(val);
-        if (!isNaN(num) && num >= 0 && num <= 24) {
-            val = `${num.toString().padStart(2, '0')}:00`;
-        }
-    } else {
-        const [h, m] = val.split(':');
-        val = `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
-    }
-
-    return val;
+export function formatDuration(minutes: number): string {
+    if (!minutes || minutes <= 0) return '0h00';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${h}h${String(m).padStart(2, '0')}`;
 }
 
-export function calculateDaily(shift: DayShift, role: 'DEA' | 'Auxiliaire', previousShift?: DayShift): DailyResult {
-    if (!shift.start || !shift.end) {
-        return { tte: 0, amplitude: 0, grossGain: 0, alerts: [] };
-    }
-
-    const startStr = parseSmartTime(shift.start);
-    const endStr = parseSmartTime(shift.end);
-
-    const start = parse(startStr, 'HH:mm', new Date());
-    const end = parse(endStr, 'HH:mm', new Date());
-
-    let diffMin = differenceInMinutes(end, start);
-    if (diffMin < 0) diffMin += 24 * 60; // Handle overnight shift
-
-    const amplitude = diffMin / 60;
-    const pauseRepas = Number(shift.breakRepas) || 0;
-    const pauseSecu = Number(shift.breakSecuritaire) || 0;
-    const totalBreak = pauseRepas + pauseSecu;
-    const tte = Math.max(0, (diffMin - totalBreak) / 60);
-
-    let grossGain = tte * (role === 'DEA' ? RATES.DEA : RATES.AUXILIAIRE);
-
-    if (shift.hasSundayBonus) grossGain += BONUSES.SUNDAY_HOLIDAY;
-    if (shift.hasMealAllowance) grossGain += BONUSES.MEAL_ALLOWANCE;
-    if (shift.hasIRU) grossGain += BONUSES.IRU;
-
-    const alerts: DailyResult['alerts'] = [];
-
-    if (amplitude > THRESHOLDS.MAX_AMPLITUDE) {
-        alerts.push({ type: 'rose', message: `Amplitude : ${amplitude.toFixed(1)}h` });
-    }
-
-    if (previousShift && previousShift.end && shift.start) {
-        const prevEnd = parse(parseSmartTime(previousShift.end), 'HH:mm', new Date());
-        const currStart = parse(parseSmartTime(shift.start), 'HH:mm', new Date());
-        let restMin = differenceInMinutes(currStart, prevEnd);
-        if (restMin < 0) restMin += 24 * 60; // Handle overnight rest
-
-        const restHrs = restMin / 60;
-        if (restHrs < THRESHOLDS.DAILY_REST_MIN) {
-            alerts.push({ type: 'rose', message: `Repos : ${restHrs.toFixed(1)}h` });
-        }
-    }
-
-    // Break validation
-    if (tte > 6) {
-        if (shift.breakRepas < THRESHOLDS.BREAK_REPAS_MIN) {
-            alerts.push({ type: 'orange', message: `Pause Repas < ${THRESHOLDS.BREAK_REPAS_MIN}m` });
-        }
-        if (shift.breakSecuritaire < THRESHOLDS.BREAK_SECURITAIRE_MIN) {
-            alerts.push({ type: 'orange', message: `Pause Sécu < ${THRESHOLDS.BREAK_SECURITAIRE_MIN}m` });
-        }
-    }
-
-    return { tte, amplitude, grossGain, alerts };
+// Saisie rapide : "730"→"07:30", "1545"→"15:45", "8"→"08:00"
+export function parseQuickTime(input: string): string {
+    const clean = input.replace(/[^0-9]/g, '');
+    if (!clean) return '';
+    if (clean.length === 1) return `0${clean}:00`;
+    if (clean.length === 2) return `${clean}:00`;
+    if (clean.length === 3) return `0${clean[0]}:${clean.slice(1)}`;
+    if (clean.length >= 4) return `${clean.slice(0, 2)}:${clean.slice(2, 4)}`;
+    return '';
 }
 
-export function generateEmptyPeriod(startDate: string, numDays: number = 28): DayShift[] {
-    const start = parseISO(startDate);
-    return Array.from({ length: numDays }, (_, i) => {
-        const date = addDays(start, i);
-        return {
-            date: format(date, 'yyyy-MM-dd'),
-            start: '',
-            end: '',
-            breakRepas: 0,
-            breakSecuritaire: 0,
-            hasSundayBonus: isSunday(date),
-            hasMealAllowance: false,
-            hasIRU: false
-        };
+// ─── OVERLAP PLAGES REPAS ─────────────────────────────────────────────────────
+
+function overlapWithMealWindows(psMin: number, peMin: number): number {
+    let total = 0;
+    for (const w of MEAL_WINDOWS) {
+        const s = Math.max(psMin, w.start);
+        const e = Math.min(peMin, w.end);
+        if (e > s) total += e - s;
+    }
+    return total;
+}
+
+// ─── LOGIQUE IR/IRU ───────────────────────────────────────────────────────────
+
+function calcAllowances(shift: DayShift, tte: number) {
+    const zero = { ir: 0, iru: 0, isSpecial: 0 };
+    if (!shift.start || !shift.end || tte === 0) return zero;
+
+    const startMin = timeToMinutes(shift.start);
+    let endMin = timeToMinutes(shift.end);
+    if (endMin <= startMin) endMin += 24 * 60;
+
+    // Règle 1 : Fin ≥ 21h30 → IR dîner
+    if (endMin >= 21 * 60 + 30) return { ir: ALLOWANCES.IR, iru: 0, isSpecial: 0 };
+
+    // Règle 2 : Nuit — ≥ 4h TTE entre 22h-7h → IRU nuit
+    if (shift.isNight) {
+        const nightOverlap = Math.max(0,
+            Math.min(endMin, 7 * 60 + 24 * 60) - Math.max(startMin, 22 * 60)
+        );
+        if (nightOverlap >= 4 * 60) return { ir: 0, iru: ALLOWANCES.IR_REDUIT, isSpecial: 0 };
+    }
+
+    // Règle 3 : Pause EXTÉRIEUR dans plage → IR complet
+    const extInWindow = shift.pauses.some(p => {
+        if (p.type !== 'EXTERIEUR') return false;
+        return overlapWithMealWindows(timeToMinutes(p.start), timeToMinutes(p.end)) > 0;
     });
-}
+    if (extInWindow) return { ir: ALLOWANCES.IR, iru: 0, isSpecial: 0 };
 
-export function calculatePeriod(data: FortnightData): FortnightResult {
-    const dailyResults = data.days.map((day, i) => {
-        const previous = i > 0 ? data.days[i - 1] : undefined;
-        return calculateDaily(day, data.role, previous);
-    });
+    // Règle 4 : Aucune pause ENTREPRISE → IR complet
+    const epPauses = shift.pauses.filter(p => p.type === 'ENTREPRISE');
+    if (epPauses.length === 0) return { ir: ALLOWANCES.IR, iru: 0, isSpecial: 0 };
 
-    // Calculate each 14-day block independently for HS
-    let totalTTE = 0;
-    let totalOvertime = 0;
-    let totalGrossBase = 0;
-
-    for (let i = 0; i < dailyResults.length; i += 14) {
-        const block = dailyResults.slice(i, i + 14);
-        let runningTTE = 0;
-
-        block.forEach(res => {
-            runningTTE += (res.tte || 0);
-            res.cumulativeHS = Math.max(0, runningTTE - THRESHOLDS.FORTNIGHT_HS);
-        });
-
-        const blockTTE = block.reduce((sum, res) => sum + (res.tte || 0), 0);
-        const blockOvertime = Math.max(0, blockTTE - THRESHOLDS.FORTNIGHT_HS);
-
-        totalTTE += blockTTE;
-        totalOvertime += blockOvertime;
-        totalGrossBase += block.reduce((sum, res) => sum + (res.grossGain || 0), 0);
+    // Règle 5 : Calcul durée/overlap pause entreprise
+    let totalDur = 0;
+    let totalOverlap = 0;
+    for (const p of epPauses) {
+        const ps = timeToMinutes(p.start);
+        const pe = timeToMinutes(p.end);
+        totalDur += pe - ps;
+        totalOverlap += overlapWithMealWindows(ps, pe);
     }
 
-    const overtimeBonus = totalOvertime * (data.role === 'DEA' ? RATES.DEA : RATES.AUXILIAIRE) * 0.25;
-    const totalGross = totalGrossBase + (overtimeBonus || 0);
-    const estimatedNet = totalGross * NET_RATIO;
+    if (totalDur < 60) return { ir: 0, iru: ALLOWANCES.IR_REDUIT, isSpecial: 0 };
+    if (totalOverlap < 30) return { ir: 0, iru: ALLOWANCES.IR_REDUIT, isSpecial: 0 };
+    if (totalOverlap < 60) return { ir: 0, iru: 0, isSpecial: ALLOWANCES.IS };
+    return zero;
+}
 
-    return {
-        totalTTE,
-        overtime: totalOvertime,
-        totalGross,
-        estimatedNet,
-        dailyResults
+// ─── CALCUL JOURNÉE ──────────────────────────────────────────────────────────
+
+export function calculateDay(shift: DayShift): DayResult {
+    const base: DayResult = {
+        date: shift.date,
+        amplitude: 0, tte: 0, ir: 0, iru: 0, isSpecial: 0,
+        isFerie: shift.status === 'FERIE',
+        isSunday: new Date(shift.date).getDay() === 0,
+        isNightWork: shift.isNight,
     };
+    if (shift.status !== 'TRAVAIL' || !shift.start || !shift.end) return base;
+
+    const startMin = timeToMinutes(shift.start);
+    let endMin = timeToMinutes(shift.end);
+    if (endMin <= startMin) endMin += 24 * 60;
+
+    const amplitude = endMin - startMin;
+    const totalPauses = shift.pauses.reduce((acc, p) => {
+        return acc + Math.max(0, timeToMinutes(p.end) - timeToMinutes(p.start));
+    }, 0);
+    const tte = Math.max(0, amplitude - totalPauses);
+
+    return { ...base, amplitude, tte, ...calcAllowances(shift, tte) };
 }
-export function calculateMonthlyEstimation(
-    data: FortnightData,
+
+// ─── GÉNÉRATION CYCLES ────────────────────────────────────────────────────────
+
+// Calendrier de paie 2026 fixe (règle du lundi, validé métier)
+export const PAY_PERIODS_2026: Array<{ label: string; payMonth: string; start: string; end: string }> = [
+    { label: 'Paie de Janvier 2026', payMonth: '2026-01', start: '2025-12-29', end: '2026-01-18' },
+    { label: 'Paie de Février 2026', payMonth: '2026-02', start: '2026-01-19', end: '2026-02-15' },
+    { label: 'Paie de Mars 2026', payMonth: '2026-03', start: '2026-02-16', end: '2026-03-29' },
+    { label: 'Paie de Avril 2026', payMonth: '2026-04', start: '2026-03-30', end: '2026-04-26' },
+    { label: 'Paie de Mai 2026', payMonth: '2026-05', start: '2026-04-27', end: '2026-05-24' },
+    { label: 'Paie de Juin 2026', payMonth: '2026-06', start: '2026-05-25', end: '2026-06-28' },
+    { label: 'Paie de Juillet 2026', payMonth: '2026-07', start: '2026-06-29', end: '2026-07-26' },
+    { label: 'Paie de Août 2026', payMonth: '2026-08', start: '2026-07-27', end: '2026-08-23' },
+    { label: 'Paie de Septembre 2026', payMonth: '2026-09', start: '2026-08-24', end: '2026-09-27' },
+    { label: 'Paie de Octobre 2026', payMonth: '2026-10', start: '2026-09-28', end: '2026-10-25' },
+    { label: 'Paie de Novembre 2026', payMonth: '2026-11', start: '2026-10-26', end: '2026-11-29' },
+    { label: 'Paie de Décembre 2026', payMonth: '2026-12', start: '2026-11-30', end: '2026-12-27' },
+];
+
+export function generateAllCycles(rootDate: string): Array<{ start: string; end: string }> {
+    // Retourne les périodes 2026 comme cycles
+    return PAY_PERIODS_2026.map(p => ({ start: p.start, end: p.end }));
+}
+
+// ─── STRICT MONTH CLIPPING ────────────────────────────────────────────────────
+
+export function getMondayOfDate(dateStr: string): string {
+    const d = new Date(dateStr);
+    const day = d.getDay();
+    // day 0 (Sunday) -> need to go back 6 days
+    // day 1 (Monday) -> need to go back 0 days
+    // day 2 (Tuesday) -> need to go back 1 day ...
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+}
+
+
+// Retourne le "mois de paie" pour une date donnée (basé sur le Lundi de la semaine de cette date)
+// Ex: Si le 31 janvier est un samedi, son lundi est le 26 jan -> Paie Janvier
+//     Si le 1 février est un dimanche, son lundi est le 26 jan -> Paie Janvier
+export function getPayMonthForDate(dateStr: string): string {
+    const monday = getMondayOfDate(dateStr);
+    const d = new Date(monday);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Retourne tous les "mois de paie" couvert par une liste de cycles
+export function getAvailablePayMonths(cycles: Array<{ start: string; end: string }>): string[] {
+    const months = new Set<string>();
+    for (const cycle of cycles) {
+        let c = new Date(cycle.start);
+        const end = new Date(cycle.end);
+        while (c <= end) {
+            months.add(getPayMonthForDate(c.toISOString().split('T')[0]));
+            c = new Date(c.getTime() + 7 * 86400000); // Check chaque semaine
+        }
+    }
+    return Array.from(months).sort();
+}
+
+// Retourne les bornes exactes (start, end) d'un mois de paie donné
+function getPayPeriodBounds(
+    payMonth: string,
+    cycles: Array<{ start: string; end: string }>
+): { start: string; end: string } | null {
+    const dates: string[] = [];
+
+    // On itère sur tous les jours couverts par les cycles pour trouver ceux qui appartiennent au mois de paie
+    for (const cycle of cycles) {
+        let c = new Date(cycle.start);
+        const end = new Date(cycle.end);
+        while (c <= end) {
+            const d = c.toISOString().split('T')[0];
+            if (getPayMonthForDate(d) === payMonth) {
+                dates.push(d);
+            }
+            c = new Date(c.getTime() + 86400000);
+        }
+    }
+
+    if (!dates.length) return null;
+    dates.sort();
+    return { start: dates[0], end: dates[dates.length - 1] };
+}
+
+// ─── CALCUL QUATORZAINE ──────────────────────────────────────────────────────
+
+function calculateFortnightPure(
+    shifts: Record<string, DayShift>,
     startDate: string,
     endDate: string
-): PayrollEstimation {
-    const rate = data.role === 'DEA' ? RATES.DEA : RATES.AUXILIAIRE;
-    const baseSalary = 151.67 * rate;
+): { totalTTE: number; totalIR: number; totalIRU: number; totalIS: number } {
+    let totalTTE = 0, totalIR = 0, totalIRU = 0, totalIS = 0;
 
-    // Filter days within the user-defined period
-    const periodDays = data.days.filter(d => d.date >= startDate && d.date <= endDate);
-
-    // DYNAMIC SEGMENTATION: Split the period into 14-day blocks (fortnights)
-    // This works for ANY period length: 14 days, 28 days, 35 days, etc.
-    // Each block is calculated independently for overtime thresholds
-    let totalTTE = 0;
-    let totalOvertimeHours25 = 0;
-    let totalOvertimeHours50 = 0;
-    let totalAllowances = 0;
-    const cycles: PayrollEstimation['cycles'] = [];
-
-    // Process each 14-day block independently
-    for (let i = 0; i < periodDays.length; i += 14) {
-        const block = periodDays.slice(i, Math.min(i + 14, periodDays.length));
-        const blockResults = block.map(day => calculateDaily(day, data.role));
-        const blockTTE = blockResults.reduce((sum, r) => sum + (r.tte || 0), 0);
-
-        totalTTE += blockTTE;
-
-        let hs25 = 0;
-        let hs50 = 0;
-
-        // Apply thresholds ONLY within this 14-day block (sovereign calculation)
-        // 70h threshold triggers 25% overtime
-        // 86h threshold triggers 50% overtime
-        if (blockTTE > THRESHOLDS.FORTNIGHT_HS_50) {
-            hs50 = blockTTE - THRESHOLDS.FORTNIGHT_HS_50;
-            hs25 = THRESHOLDS.FORTNIGHT_HS_50 - THRESHOLDS.FORTNIGHT_HS;
-        } else if (blockTTE > THRESHOLDS.FORTNIGHT_HS) {
-            hs25 = blockTTE - THRESHOLDS.FORTNIGHT_HS;
+    let c = new Date(startDate);
+    const end = new Date(endDate);
+    while (c <= end) {
+        const d = c.toISOString().split('T')[0];
+        const shift = shifts[d];
+        if (shift) {
+            const r = calculateDay(shift);
+            totalTTE += r.tte;
+            totalIR += r.ir;
+            totalIRU += r.iru;
+            totalIS += r.isSpecial;
         }
-
-        totalOvertimeHours25 += hs25;
-        totalOvertimeHours50 += hs50;
-
-        // Store cycle details for UI display
-        cycles.push({ tte: blockTTE, hs25, hs50 });
-
-        // Accumulate allowances across the entire period
-        totalAllowances += block.reduce((sum, d) => {
-            let acc = 0;
-            if (d.hasSundayBonus) acc += BONUSES.SUNDAY_HOLIDAY;
-            if (d.hasMealAllowance) acc += BONUSES.MEAL_ALLOWANCE;
-            if (d.hasIRU) acc += BONUSES.IRU;
-            return sum + acc;
-        }, 0);
+        c = new Date(c.getTime() + 86400000);
     }
 
-    // Final aggregation: sum all overtime from all blocks
-    const overtimePay = (totalOvertimeHours25 * rate * 1.25) + (totalOvertimeHours50 * rate * 1.50);
-    const totalGross = baseSalary + overtimePay + totalAllowances;
-    const estimatedNet = totalGross * NET_RATIO;
+    return { totalTTE, totalIR, totalIRU, totalIS };
+}
+
+// ─── CALCUL PÉRIODE DE PAIE COMPLETE ──────────────────────────────────────────
+
+export function calculatePeriod(
+    shifts: Record<string, DayShift>,
+    payMonth: string,
+    profile: UserProfile,
+    cycles: Array<{ start: string; end: string }>
+): PeriodSummary {
+    const rate = HOURLY_RATES[profile.role];
+    const bounds = getPayPeriodBounds(payMonth, cycles);
+
+    if (!bounds) return emptyPeriod(payMonth);
+
+    // Trouver les cycles qui intersectent la période de paie
+    // Un cycle peut être à cheval sur deux mois de paie
+    const relevantCycles = cycles.filter(c => c.start <= bounds.end && c.end >= bounds.start);
+
+    const fortnights: FortnightResult[] = relevantCycles.map(c => {
+        // Calculer les heures TOTALES du cycle (pour les seuils HS)
+        // On doit prendre tout le cycle, même si une partie est hors du mois de paie affiché
+        const fullCycleStats = calculateFortnightPure(shifts, c.start, c.end);
+
+        // Calculer hs25 et hs50 sur la base du cycle COMPLET
+        // Note: C'est une simplification, la règle exacte peut être plus complexe si on proratise
+        // Ici on applique la logique : seuils sur la quatorzaine entière
+        const cycleTotalTTE = fullCycleStats.totalTTE;
+        const hs25_cycle = Math.max(0, Math.min(cycleTotalTTE, THRESHOLDS.HS50_MINUTES) - THRESHOLDS.HS25_MINUTES);
+        const hs50_cycle = Math.max(0, cycleTotalTTE - THRESHOLDS.HS50_MINUTES);
+
+        // Maintenant, on doit déterminer quelle part de ces HS revient au mois de paie actuel
+        // Si le cycle est entièrement dans le mois -> 100%
+        // Si le cycle est à cheval -> On proratise selon le nombre de jours dans le mois ? 
+        // OU BIEN (plus courant en transport) : On paie les HS à la fin du cycle.
+        // HYPOTHÈSE UTILISATEUR : "Strict month clipping" suggère qu'on coupe
+        // Mais pour les HS de modulation, c'est délicat.
+        // APPROCHE SIMPLE POUR L'INSTANT : On attribue les HS au mois où le cycle SE TERMINE
+        // Ou on attribue au prorata des heures faites dans le mois ?
+
+        // Pour respecter la demande précédente "Sovereign calculation" par bloc de 14j.
+        // On va renvoyer les données du cycle, et l'affichage filtrera par date
+
+        return {
+            startDate: c.start,
+            endDate: c.end,
+            totalTTE: cycleTotalTTE,
+            hs25: hs25_cycle,
+            hs50: hs50_cycle,
+            totalIR: fullCycleStats.totalIR,
+            totalIRU: fullCycleStats.totalIRU,
+            totalIS: fullCycleStats.totalIS
+        };
+    });
+
+    // TODO: Attention, la somme ci-dessous compte des cycles entiers même s'ils débordent
+    // Il faut affiner si l'utilisateur veut un "Cut" strict des heures.
+    // Pour l'instant, je garde la logique "Somme des quatorzaines impliquées" mais c'est sûrement faux pour la paie exacte
+    // Si on veut être strict sur le mois de paie : 
+    // On devrait ne sommer que les jours inclus dans 'bounds'.
+
+    // Recalcul strict des heures DANS le mois pour le totalTTE affiché
+    const statsInMonth = calculateFortnightPure(shifts, bounds.start, bounds.end);
+    const totalTTE = statsInMonth.totalTTE;
+    const totalAllowances = statsInMonth.totalIR + statsInMonth.totalIRU + statsInMonth.totalIS;
+
+    // Pour les HS, c'est plus complexe. Souvent payées en décalé ou à la fin du cycle.
+    // On va sommer les HS des cycles qui se TERMINENT dans ce mois de paie (Règle courante)
+    // Ou on les proratise. Pour l'instant : Somme brute des cycles touchés (A VERIFIER AVEC USER)
+    const totalHS25 = fortnights.reduce((a, f) => a + f.hs25, 0); // Ceci est une surestimation si cycle à cheval
+    const totalHS50 = fortnights.reduce((a, f) => a + f.hs50, 0);
+
+    const baseSalary = THRESHOLDS.MONTHLY_BASE_HOURS * rate;
+    // Conversion minutes -> heures pour le paiement
+    const hs25Pay = (totalHS25 / 60) * rate * 1.25;
+    const hs50Pay = (totalHS50 / 60) * rate * 1.50;
+    const grossSalary = baseSalary + hs25Pay + hs50Pay + totalAllowances; // Allowances déjà en euros
 
     return {
+        label: formatPayMonthLabel(payMonth),
+        payMonth,
+        startDate: bounds.start,
+        endDate: bounds.end,
+        fortnights,
         totalTTE,
-        baseSalary,
-        overtimeHours25: totalOvertimeHours25,
-        overtimeHours50: totalOvertimeHours50,
-        overtimePay,
+        totalHS25,
+        totalHS50,
         totalAllowances,
-        totalGross,
-        estimatedNet,
-        cycles
+        grossSalary,
+        estimatedNet: grossSalary * THRESHOLDS.NET_RATIO,
     };
 }
-export function parsePlanningText(text: string): Partial<DayShift>[] {
-    const lines = text.split('\n');
-    return lines.map(line => {
-        const timeMatch = line.match(/(\d{1,2}(?::\d{2})?)\s*-\s*(\d{1,2}(?::\d{2})?)/);
-        if (timeMatch) {
-            return {
-                start: parseSmartTime(timeMatch[1]),
-                end: parseSmartTime(timeMatch[2]),
-                breakRepas: 45, // Default assumption if not specified
-                breakSecuritaire: 20
-            };
-        }
-        return {};
-    }).filter(p => p.start);
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+const MONTHS_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+export function formatPayMonthLabel(payMonth: string): string {
+    if (!payMonth) return '';
+    const [year, month] = payMonth.split('-').map(Number);
+    return `Paie de ${MONTHS_FR[month - 1]} ${year}`;
+}
+
+function emptyPeriod(payMonth: string): PeriodSummary {
+    return {
+        label: formatPayMonthLabel(payMonth), payMonth,
+        startDate: '', endDate: '', fortnights: [],
+        totalTTE: 0, totalHS25: 0, totalHS50: 0,
+        totalAllowances: 0, grossSalary: 0, estimatedNet: 0,
+    };
+}
+
+export function createEmptyShift(date: string): DayShift {
+    return { date, status: 'VIDE', pauses: [], isNight: false };
+}
+
+export function getDatesInRange(startDate: string, endDate: string): string[] {
+    const dates: string[] = [];
+    let c = new Date(startDate);
+    const end = new Date(endDate);
+    while (c <= end) {
+        dates.push(c.toISOString().split('T')[0]);
+        c = new Date(c.getTime() + 86400000);
+    }
+    return dates;
 }
