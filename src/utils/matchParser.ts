@@ -246,7 +246,7 @@ export function matchShifts(
 
             // Pauses employeur non dans ShiftLock
             for (const empPause of emp.pauses) {
-                const found = (my.pauses || []).some(mp => {
+                const found = my.pauses.some(mp => {
                     const dStart = Math.abs(timeToMin(mp.start) - timeToMin(empPause.start));
                     const dEnd = Math.abs(timeToMin(mp.end) - timeToMin(empPause.end));
                     return dStart <= TOLERANCE && dEnd <= TOLERANCE;
@@ -263,7 +263,7 @@ export function matchShifts(
             }
 
             // Pauses ShiftLock non chez l'employeur
-            for (const myPause of (my.pauses || [])) {
+            for (const myPause of my.pauses) {
                 if (!myPause.start || !myPause.end) continue;
                 const found = emp.pauses.some(ep => {
                     const dStart = Math.abs(timeToMin(ep.start) - timeToMin(myPause.start));
