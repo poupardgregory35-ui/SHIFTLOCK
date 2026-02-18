@@ -1,12 +1,11 @@
-
 import React, { useState, useMemo } from 'react';
-import { CalendarDays, FileUp, UserCircle } from 'lucide-react';
+import { CalendarDays, GitCompare, UserCircle } from 'lucide-react';
 import type { TabId } from './types';
 import { useAppData } from './hooks/useAppData';
-import { generateAllCycles } from './utils/calculator';
-import StreamView from './components/StreamView';
-import ImportView from './components/ImportView';
-import ProfilView from './components/ProfilView';
+import { generateAllCycles, PAY_PERIODS_2026 } from './utils/calculator';
+import { StreamView } from './components/StreamView';
+import { MatchView } from './components/MatchView';
+import { ProfilView } from './components/ProfilView';
 
 // ─── Z-INDEX MAP (documenté pour éviter les conflits) ─────────────────────────
 // 1   : contenu normal
@@ -17,6 +16,10 @@ import ProfilView from './components/ProfilView';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('stream');
+  const [activePayMonth, setActivePayMonth] = useState(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return PAY_PERIODS_2026.find(p => today >= p.start && today <= p.end)?.payMonth || '2026-02';
+  });
   const { data, updateProfile, updateShift, importShifts, resetAllData } = useAppData();
 
   // Cycles générés une seule fois à partir de la date racine
@@ -29,7 +32,7 @@ const App: React.FC = () => {
 
   const tabs: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
     { id: 'stream', label: 'Planning', icon: <CalendarDays size={20} /> },
-    { id: 'import', label: 'Import PDF', icon: <FileUp size={20} /> },
+    { id: 'import', label: 'Match', icon: <GitCompare size={20} /> },
     { id: 'profil', label: 'Profil', icon: <UserCircle size={20} /> },
   ];
 
@@ -57,20 +60,15 @@ const App: React.FC = () => {
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-root)',
       }}>
-        {/* Logo Fallback Text if Image Fails is Handled via onError */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img
-            src="/logo.png"
-            alt="ShiftLock"
-            style={{ height: '28px', objectFit: 'contain' }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-              ((e.target as HTMLImageElement).nextSibling as HTMLElement).style.display = 'block';
-            }}
-          />
-          <span style={{ display: 'none', fontWeight: 900, color: '#f8fafc', letterSpacing: '-0.02em', fontSize: '1.1rem' }}>ShiftLock</span>
-        </div>
-
+        <img
+          src="/logo.png"
+          alt="ShiftLock"
+          style={{ height: '28px', objectFit: 'contain' }}
+          onError={e => {
+            // Fallback texte si le logo ne charge pas
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
         <div style={{
           fontSize: '0.6rem',
           fontWeight: 800,
@@ -97,11 +95,12 @@ const App: React.FC = () => {
           <StreamView
             shifts={data.shifts}
             profile={data.profile}
+            cycles={cycles}
             onUpdateShift={updateShift}
           />
         </div>
 
-        {/* IMPORT */}
+        {/* MATCH */}
         <div style={{
           position: 'absolute', inset: 0,
           display: activeTab === 'import' ? 'flex' : 'none',
@@ -109,7 +108,7 @@ const App: React.FC = () => {
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch' as any,
         }}>
-          <ImportView onImport={importShifts} />
+          <MatchView shifts={data.shifts} activePayMonth={activePayMonth} />
         </div>
 
         {/* PROFIL */}
@@ -168,26 +167,24 @@ const App: React.FC = () => {
               {isActive && (
                 <div style={{
                   position: 'absolute',
-                  top: 0, left: '25%', right: '25%',
+                  top: 0, left: '20%', right: '20%',
                   height: '2px',
                   background: 'var(--accent-gradient)',
-                  borderRadius: '0 0 4px 4px',
-                  boxShadow: '0 0 8px var(--accent)'
+                  borderRadius: '0 0 2px 2px',
                 }} />
               )}
               <span style={{
                 display: 'flex',
                 opacity: isActive ? 1 : 0.5,
-                transform: isActive ? 'scale(1.1)' : 'scale(1)',
-                transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                transition: 'all 0.15s',
               }}>
                 {tab.icon}
               </span>
               <span style={{
-                fontSize: '0.65rem',
-                fontWeight: isActive ? 700 : 500,
+                fontSize: '0.58rem',
+                fontWeight: isActive ? 700 : 400,
                 letterSpacing: '0.02em',
-                opacity: isActive ? 1 : 0.7
               }}>
                 {tab.label}
               </span>

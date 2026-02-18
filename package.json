@@ -8,10 +8,14 @@
   },
   "dependencies": {
     "date-fns": "^3.3.1",
+    "framer-motion": "^12.34.1",
     "jspdf": "^4.1.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^15.0.0",
+    "react-virtuoso": "^4.18.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",

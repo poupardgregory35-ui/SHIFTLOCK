@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AppData, DayShift, UserProfile } from '../types';
@@ -79,13 +80,64 @@ export function useAppData() {
         setData(DEFAULT_DATA);
         localStorage.removeItem(STORAGE_KEY);
     }, []);
+=======
+import { useFluidCycles } from './useFluidCycles';
+import type { AppState, DayShift } from '../types';
+
+export function useAppData() {
+    const {
+        state,
+        updateShift,
+        setRootDate,
+        setModeCalcul,
+        setRole,
+        setLevel,
+        setContractHours,
+        resetSettings
+    } = useFluidCycles();
+
+    // Map state to the structure expected by App.tsx
+    const data = {
+        profile: {
+            role: state.role,
+            level: state.level,
+            rootDate: state.rootDate,
+            modeCalcul: state.modeCalcul,
+            contractHours: state.contractHours,
+            baseRate: state.baseRate,
+        },
+        shifts: state.shifts
+    };
+
+    const updateProfile = (field: keyof Omit<AppState, 'shifts'>, value: any) => {
+        switch (field) {
+            case 'rootDate': setRootDate(value); break;
+            case 'modeCalcul': setModeCalcul(value); break;
+            case 'role': setRole(value); break;
+            case 'level': setLevel(value); break;
+            case 'contractHours': setContractHours(value); break;
+        }
+    };
+
+    const importShifts = (newShifts: Record<string, DayShift>) => {
+        // Merge new shifts into state
+        Object.entries(newShifts).forEach(([date, shift]) => {
+            updateShift(date, shift);
+        });
+    };
+>>>>>>> dca2f8b (feat: Add PDF Import, Match view and new Navigation)
 
     return {
         data,
         updateProfile,
         updateShift,
+<<<<<<< HEAD
         deleteShift,
         importShifts,
         resetAllData,
+=======
+        importShifts,
+        resetAllData: resetSettings
+>>>>>>> dca2f8b (feat: Add PDF Import, Match view and new Navigation)
     };
 }
