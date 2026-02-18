@@ -117,18 +117,18 @@ export function calculateDay(shift: DayShift): DayResult {
 
 // Calendrier de paie 2026 fixe (règle du lundi, validé métier)
 export const PAY_PERIODS_2026: Array<{ label: string; payMonth: string; start: string; end: string }> = [
-    { label: 'Paie de Janvier 2026', payMonth: '2026-01', start: '2025-12-29', end: '2026-01-18' },
-    { label: 'Paie de Février 2026', payMonth: '2026-02', start: '2026-01-19', end: '2026-02-15' },
-    { label: 'Paie de Mars 2026', payMonth: '2026-03', start: '2026-02-16', end: '2026-03-29' },
-    { label: 'Paie de Avril 2026', payMonth: '2026-04', start: '2026-03-30', end: '2026-04-26' },
-    { label: 'Paie de Mai 2026', payMonth: '2026-05', start: '2026-04-27', end: '2026-05-24' },
-    { label: 'Paie de Juin 2026', payMonth: '2026-06', start: '2026-05-25', end: '2026-06-28' },
-    { label: 'Paie de Juillet 2026', payMonth: '2026-07', start: '2026-06-29', end: '2026-07-26' },
-    { label: 'Paie de Août 2026', payMonth: '2026-08', start: '2026-07-27', end: '2026-08-23' },
-    { label: 'Paie de Septembre 2026', payMonth: '2026-09', start: '2026-08-24', end: '2026-09-27' },
-    { label: 'Paie de Octobre 2026', payMonth: '2026-10', start: '2026-09-28', end: '2026-10-25' },
-    { label: 'Paie de Novembre 2026', payMonth: '2026-11', start: '2026-10-26', end: '2026-11-29' },
-    { label: 'Paie de Décembre 2026', payMonth: '2026-12', start: '2026-11-30', end: '2026-12-27' },
+    { label: 'Janvier 2026', payMonth: '2026-01', start: '2025-12-29', end: '2026-01-18' },
+    { label: 'Février 2026', payMonth: '2026-02', start: '2026-01-19', end: '2026-02-15' },
+    { label: 'Mars 2026', payMonth: '2026-03', start: '2026-02-16', end: '2026-03-29' },
+    { label: 'Avril 2026', payMonth: '2026-04', start: '2026-03-30', end: '2026-04-26' },
+    { label: 'Mai 2026', payMonth: '2026-05', start: '2026-04-27', end: '2026-05-24' },
+    { label: 'Juin 2026', payMonth: '2026-06', start: '2026-05-25', end: '2026-06-28' },
+    { label: 'Juillet 2026', payMonth: '2026-07', start: '2026-06-29', end: '2026-07-26' },
+    { label: 'Août 2026', payMonth: '2026-08', start: '2026-07-27', end: '2026-08-23' },
+    { label: 'Septembre 2026', payMonth: '2026-09', start: '2026-08-24', end: '2026-09-27' },
+    { label: 'Octobre 2026', payMonth: '2026-10', start: '2026-09-28', end: '2026-10-25' },
+    { label: 'Novembre 2026', payMonth: '2026-11', start: '2026-10-26', end: '2026-11-29' },
+    { label: 'Décembre 2026', payMonth: '2026-12', start: '2026-11-30', end: '2026-12-27' },
 ];
 
 export function generateAllCycles(rootDate: string): Array<{ start: string; end: string }> {
@@ -322,9 +322,8 @@ const MONTHS_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
     'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
 export function formatPayMonthLabel(payMonth: string): string {
-    if (!payMonth) return '';
     const [year, month] = payMonth.split('-').map(Number);
-    return `Paie de ${MONTHS_FR[month - 1]} ${year}`;
+    return `${MONTHS_FR[month - 1]} ${year}`;
 }
 
 function emptyPeriod(payMonth: string): PeriodSummary {

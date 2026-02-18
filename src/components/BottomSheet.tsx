@@ -3,6 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Moon, ChevronDown, Clock, MessageSquare, Coffee } from 'lucide-react';
 import type { DayShift, DayStatus, Pause, PauseType } from '../types';
 import { parseQuickTime, formatDuration, timeToMinutes } from '../utils/calculator';
+import { VoiceDictation } from './VoiceDictation';
+import { Mic } from 'lucide-react';
+import { ALLOWANCES, MEAL_WINDOWS } from '../types';
 
 interface BottomSheetProps {
     date: string;
@@ -89,6 +92,7 @@ function TimeInput({ value, onChange, placeholder, label }: {
 export const BottomSheet: React.FC<BottomSheetProps> = ({ date, shift, onSave, onClose }) => {
     const [local, setLocal] = useState<DayShift>({ ...shift, pauses: [...(shift.pauses || [])] });
     const [visible, setVisible] = useState(false);
+    const [showVoice, setShowVoice] = useState(false);
 
     // Convert empty string status or undefined to VIDE for safety, though shift.status should be typed
     if (!local.status) local.status = 'VIDE';
@@ -191,14 +195,42 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ date, shift, onSave, o
                                 <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Édition du shift</div>
                                 <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f1f5f9', marginTop: '2px' }}>{label}</div>
                             </div>
-                            <button onClick={handleClose} style={{
-                                background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: '36px', height: '36px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.2s'
-                            }}>
-                                <X size={20} color="#cbd5e1" />
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    onClick={() => setShowVoice(!showVoice)}
+                                    style={{
+                                        background: showVoice ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.05)',
+                                        border: showVoice ? '1px solid rgba(99, 102, 241, 0.4)' : 'none',
+                                        borderRadius: '50%', width: '36px', height: '36px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <Mic size={20} color={showVoice ? '#818cf8' : '#cbd5e1'} />
+                                </button>
+                                <button onClick={handleClose} style={{
+                                    background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: '36px', height: '36px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.2s'
+                                }}>
+                                    <X size={20} color="#cbd5e1" />
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    {showVoice && (
+                        <VoiceDictation
+                            onApply={(updates) => {
+                                setLocal(prev => ({
+                                    ...prev,
+                                    ...updates,
+                                    // Merge pauses carefully or replace them if dictation is primary
+                                    pauses: updates.pauses ? (updates.pauses as Pause[]) : prev.pauses
+                                }));
+                                setShowVoice(false);
+                            }}
+                            onClose={() => setShowVoice(false)}
+                        />
+                    )}
 
                     {/* Status Grid */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '24px' }}>
@@ -337,23 +369,71 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ date, shift, onSave, o
                                                 background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
                                                 borderRadius: '12px', padding: '12px', position: 'relative'
                                             }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: '8px' }}>
-                                                        {PAUSE_TYPES.map(pt => (
-                                                            <button
-                                                                key={pt.value}
-                                                                onClick={() => updatePause(pause.id, { type: pt.value })}
-                                                                style={{
-                                                                    padding: '4px 8px', borderRadius: '6px', border: 'none',
-                                                                    background: pause.type === pt.value ? '#334155' : 'transparent',
-                                                                    color: pause.type === pt.value ? '#f1f5f9' : '#64748b',
-                                                                    fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer',
-                                                                    transition: 'all 0.15s'
-                                                                }}
-                                                            >
-                                                                {pt.icon} {pt.label}
-                                                            </button>
-                                                        ))}
+                                                        {(() => {
+                                                            const startMin = timeToMinutes(pause.start);
+                                                            const isMealTime = MEAL_WINDOWS.some(w => startMin >= w.start && startMin <= w.end);
+                                                            const isMeal = pause.isMeal ?? isMealTime;
+
+                                                            if (isMeal) {
+                                                                // Special Meal UI: IR or IRU (represented by Exterieur vs Entreprise)
+                                                                return (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => updatePause(pause.id, { type: 'EXTERIEUR' })}
+                                                                            style={{
+                                                                                padding: '6px 12px', borderRadius: '6px', border: 'none',
+                                                                                background: pause.type === 'EXTERIEUR' ? '#22c55e' : 'transparent',
+                                                                                color: pause.type === 'EXTERIEUR' ? '#0f172a' : '#64748b',
+                                                                                fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            🍽️ IR {ALLOWANCES.IR}€
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => updatePause(pause.id, { type: 'ENTREPRISE' })}
+                                                                            style={{
+                                                                                padding: '6px 12px', borderRadius: '6px', border: 'none',
+                                                                                background: pause.type === 'ENTREPRISE' ? '#818cf8' : 'transparent',
+                                                                                color: pause.type === 'ENTREPRISE' ? '#f1f5f9' : '#64748b',
+                                                                                fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            🏢 IRU {ALLOWANCES.IR_REDUIT}€
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => updatePause(pause.id, { type: 'DOMICILE' })}
+                                                                            style={{
+                                                                                padding: '6px 12px', borderRadius: '6px', border: 'none',
+                                                                                background: pause.type === 'DOMICILE' ? '#334155' : 'transparent',
+                                                                                color: pause.type === 'DOMICILE' ? '#f1f5f9' : '#64748b',
+                                                                                fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            🏠 Domicile
+                                                                        </button>
+                                                                    </>
+                                                                );
+                                                            }
+
+                                                            // Default Security/Other UI
+                                                            return PAUSE_TYPES.map(pt => (
+                                                                <button
+                                                                    key={pt.value}
+                                                                    onClick={() => updatePause(pause.id, { type: pt.value })}
+                                                                    style={{
+                                                                        padding: '4px 8px', borderRadius: '6px', border: 'none',
+                                                                        background: pause.type === pt.value ? '#334155' : 'transparent',
+                                                                        color: pause.type === pt.value ? '#f1f5f9' : '#64748b',
+                                                                        fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer',
+                                                                        transition: 'all 0.15s'
+                                                                    }}
+                                                                >
+                                                                    {pt.icon} {pt.label}
+                                                                </button>
+                                                            ));
+                                                        })()}
                                                     </div>
                                                     <button onClick={() => removePause(pause.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}>
                                                         <Trash2 size={16} color="#ef4444" style={{ opacity: 0.7 }} />

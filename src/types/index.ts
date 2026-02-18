@@ -13,6 +13,7 @@ export interface Pause {
     start: string;   // "HH:MM"
     end: string;     // "HH:MM"
     type: PauseType;
+    isMeal?: boolean; // New flag for IR/IRU UI logic
 }
 
 export interface DayShift {
