@@ -196,6 +196,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ date, shift, onSave, o
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [parsed, setParsed] = useState<ParsedVoice | null>(null);
+    const [selectedIndemnite, setSelectedIndemnite] = useState<'IR' | 'IRU' | null>(null);
     const [voiceError, setVoiceError] = useState<string | null>(null);
 
     const recognition = useMemo(() => {
@@ -259,11 +260,22 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ date, shift, onSave, o
 
     const handleVoiceSave = () => {
         if (!parsed) return;
+
+        // Si une indemnité est sélectionnée, on l'applique à la première pause
+        const finalPauses = [...parsed.pauses];
+        if (selectedIndemnite && finalPauses.length > 0) {
+            finalPauses[0] = {
+                ...finalPauses[0],
+                type: selectedIndemnite === 'IR' ? 'EXTERIEUR' : 'ENTREPRISE',
+                isMeal: true
+            };
+        }
+
         onSave({
             status: 'TRAVAIL',
             start: parsed.start,
             end: parsed.end,
-            pauses: parsed.pauses,
+            pauses: finalPauses,
             isNight: parsed.isNight,
         });
         setVisible(false);
@@ -470,6 +482,38 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ date, shift, onSave, o
                                             </span>
                                         </div>
                                     ))}
+
+                                    {/* Sélection IR/IRU */}
+                                    {parsed.pauses.length > 0 && (
+                                        <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+                                            <div style={{ fontSize: '0.6rem', color: '#475569', marginBottom: '8px' }}>
+                                                Indemnité repas souhaitée
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                                {[
+                                                    { label: '🍽️ IR', value: 'IR', amount: '15,54€', color: '#22c55e' },
+                                                    { label: '🏢 IRU', value: 'IRU', amount: '9,59€', color: '#818cf8' },
+                                                ].map(opt => (
+                                                    <button
+                                                        key={opt.value}
+                                                        onClick={() => setSelectedIndemnite(opt.value as 'IR' | 'IRU')}
+                                                        style={{
+                                                            padding: '10px',
+                                                            borderRadius: '10px',
+                                                            border: `1px solid ${selectedIndemnite === opt.value ? opt.color : 'rgba(255,255,255,0.08)'}`,
+                                                            background: selectedIndemnite === opt.value ? `${opt.color}20` : 'rgba(255,255,255,0.03)',
+                                                            color: selectedIndemnite === opt.value ? opt.color : '#475569',
+                                                            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+                                                            textAlign: 'center'
+                                                        }}
+                                                    >
+                                                        {opt.label}<br />
+                                                        <span style={{ fontSize: '0.9rem' }}>{opt.amount}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

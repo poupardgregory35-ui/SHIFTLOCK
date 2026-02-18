@@ -1,6 +1,6 @@
-
 import type { DayShift } from '../types';
 import { calculateDay, formatDuration, PAY_PERIODS_2026 } from './calculator';
+import { jsPDF } from 'jspdf';
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
 
@@ -28,24 +28,6 @@ function getPeriodDates(payMonth: string): string[] {
         c = new Date(c.getTime() + 86400000);
     }
     return dates;
-}
-
-// ─── LOAD jsPDF DYNAMIQUE ────────────────────────────────────────────────────
-
-declare global { interface Window { jspdf: any } }
-
-async function loadJsPDF(): Promise<any> {
-    if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        script.onload = () => {
-            if (window.jspdf?.jsPDF) resolve(window.jspdf.jsPDF);
-            else reject(new Error('jsPDF non chargé'));
-        };
-        script.onerror = () => reject(new Error('Impossible de charger jsPDF'));
-        document.head.appendChild(script);
-    });
 }
 
 // ─── EXPORT PDF ───────────────────────────────────────────────────────────────
@@ -87,24 +69,16 @@ export async function exportPlanning(
         return { success: true };
     }
 
-    // Charger jsPDF
-    let JsPDF: any;
-    try {
-        JsPDF = await loadJsPDF();
-    } catch (e: any) {
-        return { success: false, error: e.message };
-    }
-
-    const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
     // ── Couleurs ──
-    const CYAN = [34, 211, 238];
-    const DARK = [7, 13, 26];
-    const SLATE = [71, 85, 105];
-    const WHITE = [241, 245, 249];
-    const GREEN = [34, 197, 94];
-    const AMBER = [245, 158, 11];
-    const RED = [239, 68, 68];
+    const CYAN: [number, number, number] = [34, 211, 238];
+    const DARK: [number, number, number] = [7, 13, 26];
+    const SLATE: [number, number, number] = [71, 85, 105];
+    const WHITE: [number, number, number] = [241, 245, 249];
+    const GREEN: [number, number, number] = [34, 197, 94];
+    const AMBER: [number, number, number] = [245, 158, 11];
+    const RED: [number, number, number] = [239, 68, 68];
 
     const W = 210; // largeur A4
     const MARGIN = 12;
