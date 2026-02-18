@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { AppData, DayShift, UserProfile } from '../types';
-import { DEFAULT_PROFILE } from '../types';
+import type { DayShift, UserProfile } from '../types';
+
+const DEFAULT_PROFILE: UserProfile = {
+  role: 'DEA',
+  level: 'LEVEL_1',
+  rootDate: '2026-01-19',
+  modeCalcul: 'quatorzaine',
+  contractHours: 35,
+  baseRate: 12.04,
+};
+
+interface AppData {
+  profile: UserProfile;
+  shifts: Record<string, DayShift>;
+}
 import { createEmptyShift } from '../utils/calculator';
 
 const STORAGE_KEY = 'shiftlock_v3';
