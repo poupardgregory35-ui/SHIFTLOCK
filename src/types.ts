@@ -1,63 +1,85 @@
-
+// ─── IDS & ENUMS ─────────────────────────────────────────────────────────────
 
 export type TabId = 'stream' | 'import' | 'profil';
-export type Role = 'DEA' | 'Auxiliaire'; // Legacy
-export type SalaryLevel = 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3';
+export type DayStatus = 'TRAVAIL' | 'REPOS' | 'CP' | 'MALADIE' | 'FORMATION' | 'FERIE' | 'VIDE';
+export type PauseType = 'ENTREPRISE' | 'EXTERIEUR' | 'DOMICILE';
+
+// ─── PAUSE ───────────────────────────────────────────────────────────────────
+
+export interface Pause {
+  id: string;
+  start: string;
+  end: string;
+  type: PauseType;
+}
+
+// ─── DAY SHIFT ───────────────────────────────────────────────────────────────
 
 export interface DayShift {
-    date: string;
-    start: string; // HH:mm
-    end: string; // HH:mm
-    breakRepas: number;
-    breakSecuritaire: number;
-    hasSundayBonus: boolean;
-    hasMealAllowance: boolean; // Legacy
-    hasIRU: boolean; // Legacy
-    isHoliday?: boolean; // Congé
-    status?: 'TRAVAIL' | 'REPOS' | 'VIDE' | 'OTHER';
-    pauses?: { start: string; end: string }[];
-    isMealDecale?: boolean; // Nouveau : Repas décalé/Casse-croûte (15.54€)
-    employerVersion?: Partial<DayShift>; // Pour le mode "VS" (Comparaison PDF)
+  date: string;
+  status: DayStatus;
+  start?: string;
+  end?: string;
+  pauses: Pause[];
+  isNight?: boolean;
+  note?: string;
 }
 
-export interface Period {
-    id: string;
-    startDate: string;
-    endDate: string;
-    name: string;
-    monthLabel: string;
-    days: string[];
-    type: 7 | 14 | 42;
+// ─── RESULTS ─────────────────────────────────────────────────────────────────
+
+export interface DayResult {
+  tte: number;
+  amplitude: number;
+  ir: number;
+  iru: number;
+  isSpecial: number;
 }
 
-export interface AppState {
-    role: Role; // Keeping for legacy compatibility if needed
-    level: SalaryLevel; // Nouveau : Niveau 2026
-    baseRate: number; // Derived actually
-    rootDate: string;
-    modeCalcul: 7 | 14 | 42;
-    contractHours: number;
-    shifts: Record<string, DayShift>;
+export interface FortnightResult {
+  totalTTE: number;
+  hs25: number;
+  hs50: number;
 }
 
-export interface DailyResult {
-    tte: number;
-    amplitude: number;
-    grossGain: number; // Total brut estimé (Legacy)
-    salary: number; // Base salaire (Brut)
-    indemnities: number; // Indemnités (Net/Non-imposable)
-    alerts: {
-        type: 'rose' | 'orange';
-        message: string;
-    }[];
-    cumulativeHS?: number;
+// ─── PROFILE ─────────────────────────────────────────────────────────────────
+
+export interface UserProfile {
+  role: string;
+  level: string;
+  rootDate: string;
+  modeCalcul: string;
+  contractHours: number;
+  baseRate: number;
 }
 
-export interface PeriodResult {
-    period: Period;
-    totalTTE: number;
-    overtime: number;
-    totalSalary: number; // Nouveau
-    totalIndemnities: number; // Nouveau
-    dailyResults: Record<string, DailyResult>;
+export interface AppData {
+  profile: UserProfile;
+  shifts: Record<string, DayShift>;
 }
+
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+
+export const ALLOWANCES = {
+  IR: 15.54,
+  IR_REDUIT: 9.59,
+  IS: 4.34,
+};
+
+export const HOURLY_RATES = {
+  N1: 12.04,
+  N2: 12.16,
+  N3: 12.79,
+};
+
+export const THRESHOLDS = {
+  WEEKLY_NORMAL: 35 * 60,
+  WEEKLY_HS_25: 43 * 60,
+  FORTNIGHT_NORMAL: 70 * 60,
+  FORTNIGHT_HS_25: 86 * 60,
+  NET_RATIO: 0.78,
+};
+
+export const MEAL_WINDOWS = [
+  { start: 11 * 60 + 30, end: 14 * 60 },
+  { start: 18 * 60 + 30, end: 22 * 60 },
+];
