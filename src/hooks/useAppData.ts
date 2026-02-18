@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DayShift, UserProfile } from '../types';
 
+const STORAGE_KEY = 'shiftlock_v3';
+
+interface AppData {
+  profile: UserProfile;
+  shifts: Record<string, DayShift>;
+}
+
 const DEFAULT_PROFILE: UserProfile = {
   role: 'DEA',
   level: 'LEVEL_1',
@@ -10,18 +17,19 @@ const DEFAULT_PROFILE: UserProfile = {
   baseRate: 12.04,
 };
 
-interface AppData {
-  profile: UserProfile;
-  shifts: Record<string, DayShift>;
-}
-import { createEmptyShift } from '../utils/calculator';
-
-const STORAGE_KEY = 'shiftlock_v3';
-
 const DEFAULT_DATA: AppData = {
   profile: DEFAULT_PROFILE,
   shifts: {},
 };
+
+function emptyShift(date: string): DayShift {
+  return {
+    date, start: '', end: '',
+    breakRepas: 0, breakSecuritaire: 0,
+    hasSundayBonus: false, hasMealAllowance: false, hasIRU: false,
+    status: 'VIDE', pauses: [],
+  };
+}
 
 export function useAppData() {
   const [data, setData] = useState<AppData>(() => {
@@ -30,24 +38,18 @@ export function useAppData() {
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
-          ...DEFAULT_DATA,
-          ...parsed,
-          profile: { ...DEFAULT_DATA.profile, ...(parsed.profile || {}) },
-          shifts: parsed.shifts || {}
+          ...DEFAULT_DATA, ...parsed,
+          profile: { ...DEFAULT_PROFILE, ...(parsed.profile || {}) },
+          shifts: parsed.shifts || {},
         };
       }
-    } catch (e) {
-      console.error('Erreur chargement données:', e);
-    }
+    } catch (e) { console.error('Erreur chargement:', e); }
     return DEFAULT_DATA;
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error('Erreur sauvegarde:', e);
-    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    catch (e) { console.error('Erreur sauvegarde:', e); }
   }, [data]);
 
   const updateProfile = useCallback((profile: Partial<UserProfile>) => {
@@ -55,28 +57,17 @@ export function useAppData() {
   }, []);
 
   const updateShift = useCallback((date: string, updates: Partial<DayShift>) => {
-    setData(prev => {
-      const existing = prev.shifts[date] || createEmptyShift(date);
-      return {
-        ...prev,
-        shifts: { ...prev.shifts, [date]: { ...existing, ...updates } },
-      };
-    });
-  }, []);
-
-  const deleteShift = useCallback((date: string) => {
-    setData(prev => {
-      const newShifts = { ...prev.shifts };
-      delete newShifts[date];
-      return { ...prev, shifts: newShifts };
-    });
+    setData(prev => ({
+      ...prev,
+      shifts: { ...prev.shifts, [date]: { ...(prev.shifts[date] || emptyShift(date)), ...updates } },
+    }));
   }, []);
 
   const importShifts = useCallback((newShifts: Record<string, Partial<DayShift>>) => {
     setData(prev => {
       const merged = { ...prev.shifts };
       for (const [date, shift] of Object.entries(newShifts)) {
-        merged[date] = { ...(merged[date] || createEmptyShift(date)), ...shift };
+        merged[date] = { ...(merged[date] || emptyShift(date)), ...shift };
       }
       return { ...prev, shifts: merged };
     });
@@ -87,12 +78,5 @@ export function useAppData() {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  return {
-    data,
-    updateProfile,
-    updateShift,
-    deleteShift,
-    importShifts,
-    resetAllData,
-  };
+  return { data, updateProfile, updateShift, importShifts, resetAllData };
 }
