@@ -52,7 +52,8 @@ async function loadJsPDF(): Promise<any> {
 
 export async function exportPlanning(
     payMonth: string,
-    shifts: Record<string, DayShift>
+    shifts: Record<string, DayShift>,
+    format: 'pdf' | 'csv' = 'pdf'
 ): Promise<{ success: boolean; error?: string }> {
     const period = PAY_PERIODS_2026.find(p => p.payMonth === payMonth);
     if (!period) return { success: false, error: 'Période introuvable' };
@@ -60,6 +61,31 @@ export async function exportPlanning(
     const [year, month] = payMonth.split('-').map(Number);
     const label = `${MONTHS_FR[month - 1]} ${year}`;
     const dates = getPeriodDates(payMonth);
+
+    if (format === 'csv') {
+        const header = ['Date', 'Jour', 'Statut', 'Debut', 'Fin', 'Pauses', 'TTE', 'Indemnites', 'Note'];
+        const rows = dates.map(date => {
+            const shift = shifts[date];
+            if (!shift || shift.status === 'VIDE') return [date, getDayName(date), 'VIDE', '', '', '', '', '', ''];
+            const res = calculateDay(shift);
+            const pauseStr = shift.pauses.map(p => `${p.start}-${p.end}`).join(' | ');
+            const irStr = res.ir > 0 ? `IR:${res.ir}€` : res.iru > 0 ? `IRU:${res.iru}€` : '';
+            return [
+                date, getDayName(date), shift.status,
+                shift.start || '', shift.end || '', pauseStr,
+                formatDuration(res.tte), irStr, shift.note || ''
+            ];
+        });
+        const csvContent = [header, ...rows].map(row => row.join(';')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ShiftLock_${label.replace(' ', '_')}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return { success: true };
+    }
 
     // Charger jsPDF
     let JsPDF: any;

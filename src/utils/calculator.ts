@@ -200,6 +200,19 @@ function getPayPeriodBounds(
 
 // ─── CALCUL QUATORZAINE ──────────────────────────────────────────────────────
 
+export function calculateFortnight(
+    shifts: Record<string, DayShift>,
+    startDate: string,
+    endDate: string
+): { totalTTE: number; totalIR: number; totalIRU: number; totalIS: number; hs25: number; hs50: number } {
+    const res = calculateFortnightPure(shifts, startDate, endDate);
+    const hs25 = Math.max(0, Math.min(res.totalTTE, 100 * 60) - 70 * 60); // Simplified thresholds for now or just return res
+    // Actually, calculateHS logic is better inside.
+    const hs25_res = Math.max(0, Math.min(res.totalTTE, 6000) - 4200); // 70h - 100h
+    const hs50_res = Math.max(0, res.totalTTE - 6000);
+    return { ...res, hs25: hs25_res, hs50: hs50_res };
+}
+
 function calculateFortnightPure(
     shifts: Record<string, DayShift>,
     startDate: string,
