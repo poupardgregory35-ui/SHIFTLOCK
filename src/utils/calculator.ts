@@ -1,191 +1,143 @@
+import type { DayShift, DayResult, FortnightResult, UserProfile } from '../types';
+import { ALLOWANCES, THRESHOLDS, MEAL_WINDOWS } from '../types';
 
-import type { DayShift, DailyResult, Period, PeriodResult, SalaryLevel } from '../types';
-import { RATES, BONUSES, THRESHOLDS, SALARY_GRID_2026, MEAL_ALLOWANCES_2026 } from '../constants';
-import { differenceInMinutes, parse, format, addDays, isSunday, parseISO } from 'date-fns';
-import { PeriodService } from './PeriodService';
+// ─── CALENDRIER PAIE 2026 ─────────────────────────────────────────────────────
 
-export const PAY_PERIODS_2026 = [
-    { payMonth: '2026-01', label: 'Janvier', start: '2025-12-29', end: '2026-01-25' },
-    { payMonth: '2026-02', label: 'Février', start: '2026-01-26', end: '2026-02-22' },
-    { payMonth: '2026-03', label: 'Mars', start: '2026-02-23', end: '2026-03-29' },
-    { payMonth: '2026-04', label: 'Avril', start: '2026-03-30', end: '2026-04-26' },
-    { payMonth: '2026-05', label: 'Mai', start: '2026-04-27', end: '2026-05-31' },
-    { payMonth: '2026-06', label: 'Juin', start: '2026-06-01', end: '2026-06-28' },
-    { payMonth: '2026-07', label: 'Juillet', start: '2026-06-29', end: '2026-07-26' },
-    { payMonth: '2026-08', label: 'Août', start: '2026-07-27', end: '2026-08-30' },
-    { payMonth: '2026-09', label: 'Septembre', start: '2026-08-31', end: '2026-09-27' },
-    { payMonth: '2026-10', label: 'Octobre', start: '2026-09-28', end: '2026-10-25' },
-    { payMonth: '2026-11', label: 'Novembre', start: '2026-10-26', end: '2026-11-29' },
-    { payMonth: '2026-12', label: 'Décembre', start: '2026-11-30', end: '2026-12-27' },
+export const PAY_PERIODS_2026: Array<{ label: string; payMonth: string; start: string; end: string }> = [
+  { label: 'Janvier 2026',   payMonth: '2026-01', start: '2025-12-29', end: '2026-01-18' },
+  { label: 'Février 2026',   payMonth: '2026-02', start: '2026-01-19', end: '2026-02-15' },
+  { label: 'Mars 2026',      payMonth: '2026-03', start: '2026-02-16', end: '2026-03-29' },
+  { label: 'Avril 2026',     payMonth: '2026-04', start: '2026-03-30', end: '2026-04-26' },
+  { label: 'Mai 2026',       payMonth: '2026-05', start: '2026-04-27', end: '2026-05-24' },
+  { label: 'Juin 2026',      payMonth: '2026-06', start: '2026-05-25', end: '2026-06-28' },
+  { label: 'Juillet 2026',   payMonth: '2026-07', start: '2026-06-29', end: '2026-07-26' },
+  { label: 'Août 2026',      payMonth: '2026-08', start: '2026-07-27', end: '2026-08-23' },
+  { label: 'Septembre 2026', payMonth: '2026-09', start: '2026-08-24', end: '2026-09-27' },
+  { label: 'Octobre 2026',   payMonth: '2026-10', start: '2026-09-28', end: '2026-10-25' },
+  { label: 'Novembre 2026',  payMonth: '2026-11', start: '2026-10-26', end: '2026-11-29' },
+  { label: 'Décembre 2026',  payMonth: '2026-12', start: '2026-11-30', end: '2026-12-27' },
 ];
 
-export const generateAllCycles = (rootDate: string): Period[] => {
-    // Default to 14 days (standard cycle)
-    return PeriodService.generateYear(rootDate, 14);
-};
+// ─── UTILS TEMPS ──────────────────────────────────────────────────────────────
 
-export function formatDuration(decimalHours: number): string {
-    if (isNaN(decimalHours)) return '0h00';
-    const totalMinutes = Math.round(decimalHours * 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return `${h}h${m.toString().padStart(2, '0')}`;
+export function timeToMinutes(time: string): number {
+  if (!time || !time.includes(':')) return 0;
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
 }
 
-export const parseSmartTime = (input: string): string => {
-    if (!input) return '';
-    // Handles '7', '14', '7:30', '7h30', '7h', '8.5', '1545' (4 digits)
-    let val = input.trim().toLowerCase().replace('h', ':');
+export function formatDuration(minutes: number): string {
+  if (!minutes || minutes <= 0) return '0h00';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h${String(m).padStart(2, '0')}`;
+}
 
-    // Handle 4-digit format: 1545 → 15:45
-    if (/^\d{4}$/.test(val)) {
-        const hours = val.substring(0, 2);
-        const minutes = val.substring(2, 4);
-        return `${hours}:${minutes}`;
-    }
+export function parseQuickTime(input: string): string {
+  const clean = input.replace(/[^0-9]/g, '');
+  if (!clean) return '';
+  if (clean.length === 1) return `0${clean}:00`;
+  if (clean.length === 2) return `${clean}:00`;
+  if (clean.length === 3) return `0${clean[0]}:${clean.slice(1)}`;
+  if (clean.length >= 4) return `${clean.slice(0, 2)}:${clean.slice(2, 4)}`;
+  return '';
+}
 
-    if (val.includes('.') && !val.includes(':')) {
-        const decimal = parseFloat(val);
-        return formatDuration(decimal).replace('h', ':');
-    }
+export function getMondayOfDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
 
-    if (!val.includes(':')) {
-        const num = parseInt(val);
-        if (!isNaN(num) && num >= 0 && num <= 24) {
-            val = `${num.toString().padStart(2, '0')}:00`;
-        }
-    } else {
-        const [h, m] = val.split(':');
-        val = `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
-    }
+export function createEmptyShift(date: string): DayShift {
+  return { date, status: 'VIDE', pauses: [], isNight: false };
+}
 
-    return val;
-};
+// ─── CALCUL JOURNÉE ───────────────────────────────────────────────────────────
 
-// Helper pour parser l'heure "HH:mm" -> minutes depuis minuit
-const parseTime = (timeStr: string): number => {
-    if (!timeStr) return 0;
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-};
+function overlapWithMealWindows(ps: number, pe: number): number {
+  let total = 0;
+  for (const w of MEAL_WINDOWS) {
+    const s = Math.max(ps, w.start);
+    const e = Math.min(pe, w.end);
+    if (e > s) total += e - s;
+  }
+  return total;
+}
 
+function calcAllowances(shift: DayShift, tte: number) {
+  const zero = { ir: 0, iru: 0, isSpecial: 0 };
+  if (!shift.start || !shift.end || tte === 0) return zero;
 
-export const calculateDaily = (shift: DayShift, level: SalaryLevel = 'LEVEL_1'): DailyResult => {
-    // 0. Si c'est un jour vide ou repos
-    if (!shift.start || !shift.end) {
-        return {
-            tte: 0,
-            amplitude: 0,
-            grossGain: 0,
-            salary: 0,
-            indemnities: 0,
-            alerts: []
-        };
-    }
+  const startMin = timeToMinutes(shift.start);
+  let endMin = timeToMinutes(shift.end);
+  if (endMin <= startMin) endMin += 24 * 60;
 
-    const startMin = parseTime(shift.start);
-    const endMin = parseTime(shift.end);
+  if (endMin >= 21 * 60 + 30) return { ir: ALLOWANCES.IR, iru: 0, isSpecial: 0 };
 
-    // Gestion nuit (si fin < début, on ajoute 24h)
-    let durationMin = endMin - startMin;
-    if (durationMin < 0) durationMin += 24 * 60;
+  const extInWindow = shift.pauses.some(p =>
+    p.type === 'EXTERIEUR' &&
+    overlapWithMealWindows(timeToMinutes(p.start), timeToMinutes(p.end)) > 0
+  );
+  if (extInWindow) return { ir: ALLOWANCES.IR, iru: 0, isSpecial: 0 };
 
-    const amplitude = durationMin / 60;
+  const epPauses = shift.pauses.filter(p => p.type === 'ENTREPRISE');
+  if (epPauses.length === 0) return { ir: ALLOWANCES.IR, iru: 0, isSpecial: 0 };
 
-    // Déduction pauses
-    const effectiveWorkMin = durationMin - (shift.breakRepas || 0) - (shift.breakSecuritaire || 0);
-    const tte = Math.max(0, effectiveWorkMin / 60);
+  let totalDur = 0, totalOverlap = 0;
+  for (const p of epPauses) {
+    const ps = timeToMinutes(p.start);
+    const pe = timeToMinutes(p.end);
+    totalDur += pe - ps;
+    totalOverlap += overlapWithMealWindows(ps, pe);
+  }
 
-    // Alertes
-    const alerts: { type: 'rose' | 'orange'; message: string }[] = [];
-    if (amplitude > THRESHOLDS.MAX_AMPLITUDE) {
-        alerts.push({ type: 'orange', message: 'Amplitude > 12h' });
-    }
+  if (totalDur < 60) return { ir: 0, iru: ALLOWANCES.IR_REDUIT, isSpecial: 0 };
+  if (totalOverlap < 30) return { ir: 0, iru: ALLOWANCES.IR_REDUIT, isSpecial: 0 };
+  if (totalOverlap < 60) return { ir: 0, iru: 0, isSpecial: ALLOWANCES.IS };
+  return zero;
+}
 
-    // --- CALCUL FINANCIER 2026 ---
+export function calculateDay(shift: DayShift): DayResult {
+  const base: DayResult = { tte: 0, amplitude: 0, ir: 0, iru: 0, isSpecial: 0 };
+  if (shift.status !== 'TRAVAIL' || !shift.start || !shift.end) return base;
 
-    // 1. Salaire Base (Brut)
-    // On récupère le taux selon le niveau
-    const hourlyRate = SALARY_GRID_2026[level] || SALARY_GRID_2026.LEVEL_1;
-    const salary = tte * hourlyRate;
+  const startMin = timeToMinutes(shift.start);
+  let endMin = timeToMinutes(shift.end);
+  if (endMin <= startMin) endMin += 24 * 60;
 
-    // 2. Indemnités (Net/Non-imposable)
-    let indemnities = 0;
+  const amplitude = endMin - startMin;
+  const totalPauses = shift.pauses.reduce((acc, p) => {
+    if (!p.start || !p.end) return acc;
+    return acc + Math.max(0, timeToMinutes(p.end) - timeToMinutes(p.start));
+  }, 0);
+  const tte = Math.max(0, amplitude - totalPauses);
 
-    // Si travaillé, on déclenche une indemnité repas
-    if (tte > 0 && !shift.isHoliday) {
-        if (shift.isMealDecale) {
-            indemnities += MEAL_ALLOWANCES_2026.REPAS_DECALE;
-        } else {
-            indemnities += MEAL_ALLOWANCES_2026.REPAS_UNIQUE;
-        }
-    }
+  return { ...base, amplitude, tte, ...calcAllowances(shift, tte) };
+}
 
-    return {
-        tte,
-        amplitude,
-        grossGain: salary + indemnities, // Total estimé
-        salary,
-        indemnities,
-        alerts
-    };
-};
+// ─── CALCUL QUATORZAINE ───────────────────────────────────────────────────────
 
-export const calculatePeriod = (
-    period: Period,
-    shifts: Record<string, DayShift>,
-    level: SalaryLevel = 'LEVEL_1'
-): PeriodResult => {
-    let totalTTE = 0;
-    let totalSalary = 0;
-    let totalIndemnities = 0;
-    const dailyResults: Record<string, DailyResult> = {};
+export function calculateFortnight(
+  shifts: Record<string, DayShift>,
+  startDate: string,
+  endDate: string
+): FortnightResult {
+  let totalTTE = 0;
+  let c = new Date(startDate + 'T12:00:00');
+  const end = new Date(endDate + 'T12:00:00');
+  while (c <= end) {
+    const d = c.toISOString().split('T')[0];
+    if (shifts[d]) totalTTE += calculateDay(shifts[d]).tte;
+    c = new Date(c.getTime() + 86400000);
+  }
+  const hs25 = Math.max(0, Math.min(totalTTE, 86 * 60) - 70 * 60);
+  const hs50 = Math.max(0, totalTTE - 86 * 60);
+  return { totalTTE, hs25, hs50 };
+}
 
-    period.days.forEach(date => {
-        const shift = shifts[date] || {
-            date, start: '', end: '', breakRepas: 0, breakSecuritaire: 0,
-            hasSundayBonus: false, hasMealAllowance: false, hasIRU: false,
-            isHoliday: false
-        };
-        const res = calculateDaily(shift, level);
-        dailyResults[date] = res;
-        totalTTE += res.tte;
-        totalSalary += res.salary;
-        totalIndemnities += res.indemnities;
-    });
-
-    let threshold = THRESHOLDS.WEEKLY_HS;
-    if (period.type === 14) threshold = THRESHOLDS.FORTNIGHT_HS;
-    if (period.type === 42) threshold = THRESHOLDS.CYCLE_3Q_HS;
-
-    const overtime = Math.max(0, totalTTE - threshold);
-
-    // Ajout de la majoration HS au salaire (Estimation +25%)
-    // Taux majoration standard est souvent 25% pour les premières HS
-    const overtimeBonus = overtime * ((SALARY_GRID_2026[level] || SALARY_GRID_2026.LEVEL_1) * 0.25);
-    totalSalary += overtimeBonus;
-
-    return {
-        period,
-        totalTTE,
-        overtime,
-        totalSalary,
-        totalIndemnities,
-        dailyResults
-    };
-};
-export function parsePlanningText(text: string): Partial<DayShift>[] {
-    const lines = text.split('\n');
-    return lines.map(line => {
-        const timeMatch = line.match(/(\d{1,2}(?::\d{2})?)\s*-\s*(\d{1,2}(?::\d{2})?)/);
-        if (timeMatch) {
-            return {
-                start: parseSmartTime(timeMatch[1]),
-                end: parseSmartTime(timeMatch[2]),
-                breakRepas: 45, // Default assumption if not specified
-                breakSecuritaire: 20
-            };
-        }
-        return {};
-    }).filter(p => p.start);
+export function generateAllCycles(rootDate: string): Array<{ start: string; end: string }> {
+  return PAY_PERIODS_2026.map(p => ({ start: p.start, end: p.end }));
 }
