@@ -2,6 +2,23 @@
 import type { DayShift, DayResult, FortnightResult, PeriodSummary, UserProfile } from '../types';
 import { ALLOWANCES, HOURLY_RATES, THRESHOLDS, MEAL_WINDOWS } from '../types';
 
+// ─── CALENDRIER DE PAIE 2026 (règle du lundi, validé métier) ─────────────────
+
+export const PAY_PERIODS_2026: Array<{ label: string; payMonth: string; start: string; end: string }> = [
+    { label: 'Janvier 2026', payMonth: '2026-01', start: '2025-12-29', end: '2026-01-18' },
+    { label: 'Février 2026', payMonth: '2026-02', start: '2026-01-19', end: '2026-02-15' },
+    { label: 'Mars 2026', payMonth: '2026-03', start: '2026-02-16', end: '2026-03-29' },
+    { label: 'Avril 2026', payMonth: '2026-04', start: '2026-03-30', end: '2026-04-26' },
+    { label: 'Mai 2026', payMonth: '2026-05', start: '2026-04-27', end: '2026-05-24' },
+    { label: 'Juin 2026', payMonth: '2026-06', start: '2026-05-25', end: '2026-06-28' },
+    { label: 'Juillet 2026', payMonth: '2026-07', start: '2026-06-29', end: '2026-07-26' },
+    { label: 'Août 2026', payMonth: '2026-08', start: '2026-07-27', end: '2026-08-23' },
+    { label: 'Septembre 2026', payMonth: '2026-09', start: '2026-08-24', end: '2026-09-27' },
+    { label: 'Octobre 2026', payMonth: '2026-10', start: '2026-09-28', end: '2026-10-25' },
+    { label: 'Novembre 2026', payMonth: '2026-11', start: '2026-10-26', end: '2026-11-29' },
+    { label: 'Décembre 2026', payMonth: '2026-12', start: '2026-11-30', end: '2026-12-27' },
+];
+
 // ─── UTILS TEMPS ─────────────────────────────────────────────────────────────
 
 export function timeToMinutes(time: string): number {
@@ -95,7 +112,7 @@ export function calculateDay(shift: DayShift): DayResult {
         date: shift.date,
         amplitude: 0, tte: 0, ir: 0, iru: 0, isSpecial: 0,
         isFerie: shift.status === 'FERIE',
-        isSunday: new Date(shift.date).getDay() === 0,
+        isSunday: new Date(shift.date + 'T12:00:00').getDay() === 0,
         isNightWork: shift.isNight,
     };
     if (shift.status !== 'TRAVAIL' || !shift.start || !shift.end) return base;
@@ -115,84 +132,68 @@ export function calculateDay(shift: DayShift): DayResult {
 
 // ─── GÉNÉRATION CYCLES ────────────────────────────────────────────────────────
 
-// Calendrier de paie 2026 fixe (règle du lundi, validé métier)
-export const PAY_PERIODS_2026: Array<{ label: string; payMonth: string; start: string; end: string }> = [
-    { label: 'Janvier 2026', payMonth: '2026-01', start: '2025-12-29', end: '2026-01-18' },
-    { label: 'Février 2026', payMonth: '2026-02', start: '2026-01-19', end: '2026-02-15' },
-    { label: 'Mars 2026', payMonth: '2026-03', start: '2026-02-16', end: '2026-03-29' },
-    { label: 'Avril 2026', payMonth: '2026-04', start: '2026-03-30', end: '2026-04-26' },
-    { label: 'Mai 2026', payMonth: '2026-05', start: '2026-04-27', end: '2026-05-24' },
-    { label: 'Juin 2026', payMonth: '2026-06', start: '2026-05-25', end: '2026-06-28' },
-    { label: 'Juillet 2026', payMonth: '2026-07', start: '2026-06-29', end: '2026-07-26' },
-    { label: 'Août 2026', payMonth: '2026-08', start: '2026-07-27', end: '2026-08-23' },
-    { label: 'Septembre 2026', payMonth: '2026-09', start: '2026-08-24', end: '2026-09-27' },
-    { label: 'Octobre 2026', payMonth: '2026-10', start: '2026-09-28', end: '2026-10-25' },
-    { label: 'Novembre 2026', payMonth: '2026-11', start: '2026-10-26', end: '2026-11-29' },
-    { label: 'Décembre 2026', payMonth: '2026-12', start: '2026-11-30', end: '2026-12-27' },
-];
-
 export function generateAllCycles(rootDate: string): Array<{ start: string; end: string }> {
-    // Retourne les périodes 2026 comme cycles
-    return PAY_PERIODS_2026.map(p => ({ start: p.start, end: p.end }));
+    const cycles: Array<{ start: string; end: string }> = [];
+    let cursor = new Date(rootDate);
+
+    // Reculer au bon point de départ (avant jan 2026)
+    const limitBack = new Date('2025-12-15');
+    while (cursor > limitBack) cursor = new Date(cursor.getTime() - 14 * 86400000);
+    while (cursor < limitBack) cursor = new Date(cursor.getTime() + 14 * 86400000);
+
+    const limitFwd = new Date('2027-01-31');
+    while (cursor < limitFwd) {
+        const start = cursor.toISOString().split('T')[0];
+        const endD = new Date(cursor.getTime() + 13 * 86400000);
+        cycles.push({ start, end: endD.toISOString().split('T')[0] });
+        cursor = new Date(cursor.getTime() + 14 * 86400000);
+    }
+    return cycles;
 }
 
 // ─── STRICT MONTH CLIPPING ────────────────────────────────────────────────────
 
 export function getMondayOfDate(dateStr: string): string {
-    const d = new Date(dateStr);
+    const d = new Date(dateStr + 'T12:00:00');
     const day = d.getDay();
-    // day 0 (Sunday) -> need to go back 6 days
-    // day 1 (Monday) -> need to go back 0 days
-    // day 2 (Tuesday) -> need to go back 1 day ...
     const diff = day === 0 ? -6 : 1 - day;
     d.setDate(d.getDate() + diff);
     return d.toISOString().split('T')[0];
 }
 
-
-// Retourne le "mois de paie" pour une date donnée (basé sur le Lundi de la semaine de cette date)
-// Ex: Si le 31 janvier est un samedi, son lundi est le 26 jan -> Paie Janvier
-//     Si le 1 février est un dimanche, son lundi est le 26 jan -> Paie Janvier
 export function getPayMonthForDate(dateStr: string): string {
     const monday = getMondayOfDate(dateStr);
-    const d = new Date(monday);
+    const d = new Date(monday + 'T12:00:00');
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// Retourne tous les "mois de paie" couvert par une liste de cycles
 export function getAvailablePayMonths(cycles: Array<{ start: string; end: string }>): string[] {
     const months = new Set<string>();
     for (const cycle of cycles) {
-        let c = new Date(cycle.start);
-        const end = new Date(cycle.end);
+        let c = new Date(cycle.start + 'T12:00:00');
+        const end = new Date(cycle.end + 'T12:00:00');
         while (c <= end) {
             months.add(getPayMonthForDate(c.toISOString().split('T')[0]));
-            c = new Date(c.getTime() + 7 * 86400000); // Check chaque semaine
+            c = new Date(c.getTime() + 7 * 86400000);
         }
     }
     return Array.from(months).sort();
 }
 
-// Retourne les bornes exactes (start, end) d'un mois de paie donné
 function getPayPeriodBounds(
     payMonth: string,
     cycles: Array<{ start: string; end: string }>
 ): { start: string; end: string } | null {
     const dates: string[] = [];
-
-    // On itère sur tous les jours couverts par les cycles pour trouver ceux qui appartiennent au mois de paie
     for (const cycle of cycles) {
-        let c = new Date(cycle.start);
-        const end = new Date(cycle.end);
+        let c = new Date(cycle.start + 'T12:00:00');
+        const end = new Date(cycle.end + 'T12:00:00');
         while (c <= end) {
             const d = c.toISOString().split('T')[0];
-            if (getPayMonthForDate(d) === payMonth) {
-                dates.push(d);
-            }
+            if (getPayMonthForDate(d) === payMonth) dates.push(d);
             c = new Date(c.getTime() + 86400000);
         }
     }
-
     if (!dates.length) return null;
     dates.sort();
     return { start: dates[0], end: dates[dates.length - 1] };
@@ -204,24 +205,11 @@ export function calculateFortnight(
     shifts: Record<string, DayShift>,
     startDate: string,
     endDate: string
-): { totalTTE: number; totalIR: number; totalIRU: number; totalIS: number; hs25: number; hs50: number } {
-    const res = calculateFortnightPure(shifts, startDate, endDate);
-    const hs25 = Math.max(0, Math.min(res.totalTTE, 100 * 60) - 70 * 60); // Simplified thresholds for now or just return res
-    // Actually, calculateHS logic is better inside.
-    const hs25_res = Math.max(0, Math.min(res.totalTTE, 6000) - 4200); // 70h - 100h
-    const hs50_res = Math.max(0, res.totalTTE - 6000);
-    return { ...res, hs25: hs25_res, hs50: hs50_res };
-}
-
-function calculateFortnightPure(
-    shifts: Record<string, DayShift>,
-    startDate: string,
-    endDate: string
-): { totalTTE: number; totalIR: number; totalIRU: number; totalIS: number } {
+): FortnightResult {
     let totalTTE = 0, totalIR = 0, totalIRU = 0, totalIS = 0;
 
-    let c = new Date(startDate);
-    const end = new Date(endDate);
+    let c = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
     while (c <= end) {
         const d = c.toISOString().split('T')[0];
         const shift = shifts[d];
@@ -235,10 +223,13 @@ function calculateFortnightPure(
         c = new Date(c.getTime() + 86400000);
     }
 
-    return { totalTTE, totalIR, totalIRU, totalIS };
+    const hs25 = Math.max(0, Math.min(totalTTE, THRESHOLDS.HS50_MINUTES) - THRESHOLDS.HS25_MINUTES);
+    const hs50 = Math.max(0, totalTTE - THRESHOLDS.HS50_MINUTES);
+
+    return { startDate, endDate, totalTTE, hs25, hs50, totalIR, totalIRU, totalIS };
 }
 
-// ─── CALCUL PÉRIODE DE PAIE COMPLETE ──────────────────────────────────────────
+// ─── CALCUL PÉRIODE DE PAIE ──────────────────────────────────────────────────
 
 export function calculatePeriod(
     shifts: Record<string, DayShift>,
@@ -251,68 +242,21 @@ export function calculatePeriod(
 
     if (!bounds) return emptyPeriod(payMonth);
 
-    // Trouver les cycles qui intersectent la période de paie
-    // Un cycle peut être à cheval sur deux mois de paie
     const relevantCycles = cycles.filter(c => c.start <= bounds.end && c.end >= bounds.start);
+    const fortnights = relevantCycles.map(c =>
+        calculateFortnight(shifts, c.start > bounds.start ? c.start : bounds.start,
+            c.end < bounds.end ? c.end : bounds.end)
+    );
 
-    const fortnights: FortnightResult[] = relevantCycles.map(c => {
-        // Calculer les heures TOTALES du cycle (pour les seuils HS)
-        // On doit prendre tout le cycle, même si une partie est hors du mois de paie affiché
-        const fullCycleStats = calculateFortnightPure(shifts, c.start, c.end);
-
-        // Calculer hs25 et hs50 sur la base du cycle COMPLET
-        // Note: C'est une simplification, la règle exacte peut être plus complexe si on proratise
-        // Ici on applique la logique : seuils sur la quatorzaine entière
-        const cycleTotalTTE = fullCycleStats.totalTTE;
-        const hs25_cycle = Math.max(0, Math.min(cycleTotalTTE, THRESHOLDS.HS50_MINUTES) - THRESHOLDS.HS25_MINUTES);
-        const hs50_cycle = Math.max(0, cycleTotalTTE - THRESHOLDS.HS50_MINUTES);
-
-        // Maintenant, on doit déterminer quelle part de ces HS revient au mois de paie actuel
-        // Si le cycle est entièrement dans le mois -> 100%
-        // Si le cycle est à cheval -> On proratise selon le nombre de jours dans le mois ? 
-        // OU BIEN (plus courant en transport) : On paie les HS à la fin du cycle.
-        // HYPOTHÈSE UTILISATEUR : "Strict month clipping" suggère qu'on coupe
-        // Mais pour les HS de modulation, c'est délicat.
-        // APPROCHE SIMPLE POUR L'INSTANT : On attribue les HS au mois où le cycle SE TERMINE
-        // Ou on attribue au prorata des heures faites dans le mois ?
-
-        // Pour respecter la demande précédente "Sovereign calculation" par bloc de 14j.
-        // On va renvoyer les données du cycle, et l'affichage filtrera par date
-
-        return {
-            startDate: c.start,
-            endDate: c.end,
-            totalTTE: cycleTotalTTE,
-            hs25: hs25_cycle,
-            hs50: hs50_cycle,
-            totalIR: fullCycleStats.totalIR,
-            totalIRU: fullCycleStats.totalIRU,
-            totalIS: fullCycleStats.totalIS
-        };
-    });
-
-    // TODO: Attention, la somme ci-dessous compte des cycles entiers même s'ils débordent
-    // Il faut affiner si l'utilisateur veut un "Cut" strict des heures.
-    // Pour l'instant, je garde la logique "Somme des quatorzaines impliquées" mais c'est sûrement faux pour la paie exacte
-    // Si on veut être strict sur le mois de paie : 
-    // On devrait ne sommer que les jours inclus dans 'bounds'.
-
-    // Recalcul strict des heures DANS le mois pour le totalTTE affiché
-    const statsInMonth = calculateFortnightPure(shifts, bounds.start, bounds.end);
-    const totalTTE = statsInMonth.totalTTE;
-    const totalAllowances = statsInMonth.totalIR + statsInMonth.totalIRU + statsInMonth.totalIS;
-
-    // Pour les HS, c'est plus complexe. Souvent payées en décalé ou à la fin du cycle.
-    // On va sommer les HS des cycles qui se TERMINENT dans ce mois de paie (Règle courante)
-    // Ou on les proratise. Pour l'instant : Somme brute des cycles touchés (A VERIFIER AVEC USER)
-    const totalHS25 = fortnights.reduce((a, f) => a + f.hs25, 0); // Ceci est une surestimation si cycle à cheval
+    const totalTTE = fortnights.reduce((a, f) => a + f.totalTTE, 0);
+    const totalHS25 = fortnights.reduce((a, f) => a + f.hs25, 0);
     const totalHS50 = fortnights.reduce((a, f) => a + f.hs50, 0);
+    const totalAllowances = fortnights.reduce((a, f) => a + f.totalIR + f.totalIRU + f.totalIS, 0);
 
     const baseSalary = THRESHOLDS.MONTHLY_BASE_HOURS * rate;
-    // Conversion minutes -> heures pour le paiement
     const hs25Pay = (totalHS25 / 60) * rate * 1.25;
     const hs50Pay = (totalHS50 / 60) * rate * 1.50;
-    const grossSalary = baseSalary + hs25Pay + hs50Pay + totalAllowances; // Allowances déjà en euros
+    const grossSalary = baseSalary + hs25Pay + hs50Pay + totalAllowances;
 
     return {
         label: formatPayMonthLabel(payMonth),
@@ -336,7 +280,7 @@ const MONTHS_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
 
 export function formatPayMonthLabel(payMonth: string): string {
     const [year, month] = payMonth.split('-').map(Number);
-    return `${MONTHS_FR[month - 1]} ${year}`;
+    return `Paie de ${MONTHS_FR[month - 1]} ${year}`;
 }
 
 function emptyPeriod(payMonth: string): PeriodSummary {
@@ -354,8 +298,8 @@ export function createEmptyShift(date: string): DayShift {
 
 export function getDatesInRange(startDate: string, endDate: string): string[] {
     const dates: string[] = [];
-    let c = new Date(startDate);
-    const end = new Date(endDate);
+    let c = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
     while (c <= end) {
         dates.push(c.toISOString().split('T')[0]);
         c = new Date(c.getTime() + 86400000);
