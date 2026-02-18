@@ -1,8 +1,9 @@
 
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { DayShift, UserProfile } from '../types';
 import { PAY_PERIODS_2026, calculateDay, calculatePeriod, formatDuration, createEmptyShift, getMondayOfDate } from '../utils/calculator';
+import { exportPlanning } from '../utils/pdfExport';
+import { ChevronLeft, ChevronRight, FileDown, Share2 } from 'lucide-react';
+import type { DayShift, UserProfile } from '../types';
 import ShiftCard from './ShiftCard';
 import BottomSheet from './BottomSheet';
 
@@ -23,6 +24,7 @@ function getCurrentPayMonth(): string {
 const StreamView: React.FC<StreamViewProps> = ({ shifts, profile, onUpdateShift }) => {
     const [activeMonth, setActiveMonth] = useState<string>(() => getCurrentPayMonth());
     const [editingDate, setEditingDate] = useState<string | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
 
     const periodIdx = PAY_PERIODS_2026.findIndex(p => p.payMonth === activeMonth);
     const period = PAY_PERIODS_2026[periodIdx];
@@ -80,6 +82,22 @@ const StreamView: React.FC<StreamViewProps> = ({ shifts, profile, onUpdateShift 
         if (canNext) setActiveMonth(PAY_PERIODS_2026[periodIdx + 1].payMonth);
     };
 
+    const handleExport = async () => {
+        if (isExporting) return;
+        setIsExporting(true);
+        try {
+            const result = await exportPlanning(activeMonth, shifts);
+            if (!result.success) {
+                alert(`Erreur export : ${result.error}`);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Une erreur est survenue lors de la génération du PDF.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     if (!period) return <div style={{ padding: 20, color: 'white' }}>Période introuvable</div>;
 
     const startLabel = period.start.split('-').reverse().slice(0, 2).join('/');
@@ -130,9 +148,35 @@ const StreamView: React.FC<StreamViewProps> = ({ shifts, profile, onUpdateShift 
                             fontSize: '0.75rem',
                             color: 'var(--text-secondary)',
                             fontVariantNumeric: 'tabular-nums',
-                            fontWeight: 500
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
                         }}>
-                            {startLabel} → {endLabel} · {weekGroups.length} semaines
+                            <span>{startLabel} → {endLabel}</span>
+                            <span style={{ opacity: 0.3 }}>·</span>
+                            <button
+                                onClick={handleExport}
+                                disabled={isExporting}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--accent-cyan)',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                    transition: 'background 0.2s',
+                                    opacity: isExporting ? 0.5 : 1
+                                }}
+                            >
+                                {isExporting ? '...' : <><Share2 size={12} /> PDF</>}
+                            </button>
                         </div>
                     </div>
 
