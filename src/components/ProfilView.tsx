@@ -85,12 +85,12 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
       }}>
         <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          Propulsé par CAPSO
+          Envie de changement ?
         </div>
         <img src={QR_CAPSO} alt="CAPSO" style={{ width: '96px', height: '96px', borderRadius: '8px' }} />
         <div style={{ fontSize: '0.72rem', color: '#475569', textAlign: 'center', lineHeight: 1.4 }}>
-          Formation · Outils · Conseil<br />
-          <span style={{ color: '#22d3ee', fontWeight: 700 }}>capso.fr</span>
+          
+          <span style={{ color: '#22d3ee', fontWeight: 700 }}>Rejoins Upswipe !</span>
         </div>
       </div>
     </div>
