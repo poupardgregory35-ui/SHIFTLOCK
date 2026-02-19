@@ -22,7 +22,6 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
     <div style={{ padding: '20px 16px 40px', maxWidth: '430px', margin: '0 auto', width: '100%' }}>
       <h2 style={{ color: '#f1f5f9', fontSize: '1.1rem', fontWeight: 900, marginBottom: '24px' }}>Profil</h2>
 
-      {/* Rôle */}
       <Section label="Rôle">
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {ROLES.map(r => (
@@ -31,7 +30,6 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         </div>
       </Section>
 
-      {/* Échelon */}
       <Section label="Échelon">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {LEVELS.map(l => (
@@ -40,7 +38,6 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         </div>
       </Section>
 
-      {/* Date racine */}
       <Section label="Date de début de cycle">
         <input
           type="date"
@@ -54,14 +51,12 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         />
       </Section>
 
-      {/* Stats */}
       <Section label="Données">
         <div style={{ color: '#475569', fontSize: '0.85rem' }}>
           {shiftsCount} journée{shiftsCount > 1 ? 's' : ''} enregistrée{shiftsCount > 1 ? 's' : ''}
         </div>
       </Section>
 
-      {/* Reset */}
       <Section label="Réinitialisation">
         {confirmReset ? (
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -81,6 +76,37 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
           </button>
         )}
       </Section>
+
+      {/* ─── CAPSO QR ─── */}
+      <div style={{
+        marginTop: '40px',
+        padding: '20px',
+        borderRadius: '16px',
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px',
+      }}>
+        <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Propulsé par CAPSO
+        </div>
+        <img
+          src="/qr-capso.png"
+          alt="CAPSO"
+          style={{
+            width: '96px',
+            height: '96px',
+            borderRadius: '8px',
+            opacity: 0.85,
+          }}
+        />
+        <div style={{ fontSize: '0.72rem', color: '#475569', textAlign: 'center', lineHeight: 1.4 }}>
+          Formation · Outils · Conseil<br />
+          <span style={{ color: '#22d3ee', fontWeight: 700 }}>capso.fr</span>
+        </div>
+      </div>
     </div>
   );
 };
