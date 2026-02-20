@@ -63,9 +63,47 @@ export interface UserProfile {
   heuresContrat?: number;
 }
 
-// ─── MEAL_WINDOWS (requis par calculator.ts) ─────────────────────────────────
+// ─── DayShift / FortnightResult (ShiftLock V3) ───────────────────────────────
 
-export const MEAL_WINDOWS = [
-  { start: '11:00', end: '14:30', label: 'déjeuner' },
-  { start: '18:30', end: '22:00', label: 'dîner' },
-] as const;
+export type ShiftStatus = 'TRAVAIL' | 'REPOS' | 'CP' | 'MALADIE' | 'FORMATION' | 'FERIE' | 'VIDE';
+export type PauseType = 'ENTREPRISE' | 'EXTERIEUR' | 'DOMICILE';
+
+export interface Pause {
+  id: string;
+  start: string;
+  end: string;
+  type: PauseType;
+}
+
+export interface DayShift {
+  date: string;
+  status: ShiftStatus;
+  start?: string;
+  end?: string;
+  pauses: Pause[];
+  isNight: boolean;
+}
+
+export interface FortnightResult {
+  totalTTE: number;
+  hs25: number;
+  hs50: number;
+}
+
+// ─── CONSTANTES (requises par calculator.ts) ─────────────────────────────────
+
+export const ALLOWANCES = {
+  IR:        15.54,
+  IR_REDUIT:  9.59,
+  IS:         4.34,
+} as const;
+
+export const THRESHOLDS = {
+  HS25_START: 70 * 60,   // 70h en minutes
+  HS50_START: 86 * 60,   // 86h en minutes
+} as const;
+
+export const MEAL_WINDOWS: Array<{ start: number; end: number }> = [
+  { start: 11 * 60 + 0,  end: 14 * 60 + 30 },  // 11h00 - 14h30
+  { start: 18 * 60 + 30, end: 22 * 60 + 0  },  // 18h30 - 22h00
+];
