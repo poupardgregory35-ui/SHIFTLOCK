@@ -57,9 +57,15 @@ export interface UserProfile {
   role: string;
   level: string;
   rootDate: string;
-  // Enrichissement profil
-  prenom?: string;        // Stocké complet, affiché masqué
-  nomInitiale?: string;   // Initiale du nom ex: "P"
-  dateEmbauche?: string;  // ISO date ex: "2020-03-15"
-  heuresContrat?: number; // Heures contractuelles ex: 35
+  prenom?: string;
+  nomInitiale?: string;
+  dateEmbauche?: string;
+  heuresContrat?: number;
 }
+
+// ─── MEAL_WINDOWS (requis par calculator.ts) ─────────────────────────────────
+
+export const MEAL_WINDOWS = [
+  { start: '11:00', end: '14:30', label: 'déjeuner' },
+  { start: '18:30', end: '22:00', label: 'dîner' },
+] as const;
