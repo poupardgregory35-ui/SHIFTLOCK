@@ -1,85 +1,65 @@
-// ─── IDS & ENUMS ─────────────────────────────────────────────────────────────
+export type SalaryLevel = 1 | 2 | 3;
+export type BreakType = 'entreprise' | 'exterieur' | 'domicile';
+export type TabType = 'stream' | 'import' | 'profil';
 
-export type TabId = 'stream' | 'import' | 'profil';
-export type DayStatus = 'TRAVAIL' | 'REPOS' | 'CP' | 'MALADIE' | 'FORMATION' | 'FERIE' | 'VIDE';
-export type PauseType = 'ENTREPRISE' | 'EXTERIEUR' | 'DOMICILE';
-
-// ─── PAUSE ───────────────────────────────────────────────────────────────────
-
-export interface Pause {
+export interface Break {
   id: string;
   start: string;
   end: string;
-  type: PauseType;
+  type: BreakType;
 }
 
-// ─── DAY SHIFT ───────────────────────────────────────────────────────────────
-
-export interface DayShift {
+export interface DayEntry {
   date: string;
-  status: DayStatus;
   start?: string;
   end?: string;
-  pauses: Pause[];
-  isNight?: boolean;
+  breaks: Break[];
+  isNight: boolean;
+  isFerie: boolean;
   note?: string;
 }
 
-// ─── RESULTS ─────────────────────────────────────────────────────────────────
-
 export interface DayResult {
-  tte: number;
+  date: string;
   amplitude: number;
+  tte: number;
+  breakTotal: number;
   ir: number;
-  iru: number;
-  isSpecial: number;
+  irType: 'complet' | 'reduit' | 'is' | 'diner' | 'iru_nuit' | 'none';
+  isNightWork: boolean;
 }
 
-export interface FortnightResult {
-  totalTTE: number;
+export interface QuatorzaineResult {
+  index: number;
+  startDate: string;
+  endDate: string;
+  tte: number;
   hs25: number;
   hs50: number;
 }
 
-// ─── PROFILE ─────────────────────────────────────────────────────────────────
+export interface Profile {
+  firstName: string;
+  rootDate: string;
+  level: SalaryLevel;
+  moneyMode: boolean;
+  showOnboarding: boolean;
+}
+
+export interface AppState {
+  profile: Profile;
+  days: Record<string, DayEntry>;
+}
+
+// ─── UserProfile (ShiftLock V3) ──────────────────────────────────────────────
 
 export interface UserProfile {
   role: string;
   level: string;
   rootDate: string;
-  modeCalcul: string;
-  contractHours: number;
-  baseRate: number;
+  // Enrichissement profil
+  prenom?: string;        // Stocké complet, affiché masqué
+  nomInitiale?: string;   // Initiale du nom ex: "P"
+  dateEmbauche?: string;  // ISO date ex: "2020-03-15"
+  heuresContrat?: number; // Heures contractuelles ex: 35
 }
-
-export interface AppData {
-  profile: UserProfile;
-  shifts: Record<string, DayShift>;
-}
-
-// ─── CONSTANTS ───────────────────────────────────────────────────────────────
-
-export const ALLOWANCES = {
-  IR: 15.54,
-  IR_REDUIT: 9.59,
-  IS: 4.34,
-};
-
-export const HOURLY_RATES = {
-  N1: 12.04,
-  N2: 12.16,
-  N3: 12.79,
-};
-
-export const THRESHOLDS = {
-  WEEKLY_NORMAL: 35 * 60,
-  WEEKLY_HS_25: 43 * 60,
-  FORTNIGHT_NORMAL: 70 * 60,
-  FORTNIGHT_HS_25: 86 * 60,
-  NET_RATIO: 0.78,
-};
-
-export const MEAL_WINDOWS = [
-  { start: 11 * 60 + 30, end: 14 * 60 },
-  { start: 18 * 60 + 30, end: 22 * 60 },
-];

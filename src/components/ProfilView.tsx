@@ -17,13 +17,80 @@ const LEVELS = [
   { id: 'LEVEL_3', label: 'Échelon 3 — 12,79€/h' },
 ];
 
+function maskPrenom(prenom: string): string {
+  if (!prenom || prenom.length <= 3) return prenom;
+  return prenom.slice(0, 3) + '***';
+}
+
+function displayIdentite(prenom?: string, nomInitiale?: string): string {
+  if (!prenom) return '';
+  const masked = maskPrenom(prenom);
+  return nomInitiale ? `${masked} ${nomInitiale}.` : masked;
+}
+
+function calcAnciennete(dateEmbauche?: string): string {
+  if (!dateEmbauche) return '';
+  const debut = new Date(dateEmbauche);
+  const now = new Date();
+  const mois = (now.getFullYear() - debut.getFullYear()) * 12 + (now.getMonth() - debut.getMonth());
+  const ans = Math.floor(mois / 12);
+  const m = mois % 12;
+  if (ans === 0) return `${m} mois`;
+  return m > 0 ? `${ans} an${ans > 1 ? 's' : ''} ${m} mois` : `${ans} an${ans > 1 ? 's' : ''}`;
+}
+
 export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, onUpdateProfile, onResetData }) => {
   const [confirmReset, setConfirmReset] = useState(false);
+  const [prenomInput, setPrenomInput] = useState(profile.prenom || '');
+  const [nomInput, setNomInput] = useState(profile.nomInitiale || '');
+
+  const identite = displayIdentite(profile.prenom, profile.nomInitiale);
+  const anciennete = calcAnciennete(profile.dateEmbauche);
 
   return (
     <div style={{ padding: '20px 16px 40px', maxWidth: '430px', margin: '0 auto', width: '100%' }}>
-      <h2 style={{ color: '#f1f5f9', fontSize: '1.1rem', fontWeight: 900, marginBottom: '24px' }}>Profil</h2>
+      <h2 style={{ color: '#f1f5f9', fontSize: '1.1rem', fontWeight: 900, marginBottom: '24px' }}>
+        Profil
+        {identite && (
+          <span style={{ color: '#22d3ee', fontWeight: 400, fontSize: '0.85rem', marginLeft: '10px' }}>{identite}</span>
+        )}
+      </h2>
 
+      {/* ─── IDENTITÉ ─── */}
+      <Section label="Identité">
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ flex: 2 }}>
+            <div style={{ fontSize: '0.6rem', color: '#334155', marginBottom: '4px' }}>Prénom</div>
+            <input
+              type="text"
+              placeholder="Grégory"
+              value={prenomInput}
+              onChange={e => setPrenomInput(e.target.value)}
+              onBlur={() => onUpdateProfile({ prenom: prenomInput })}
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.6rem', color: '#334155', marginBottom: '4px' }}>Initiale nom</div>
+            <input
+              type="text"
+              placeholder="P"
+              maxLength={1}
+              value={nomInput}
+              onChange={e => setNomInput(e.target.value.toUpperCase())}
+              onBlur={() => onUpdateProfile({ nomInitiale: nomInput })}
+              style={{ ...inputStyle, textTransform: 'uppercase', textAlign: 'center' }}
+            />
+          </div>
+        </div>
+        {profile.prenom && (
+          <div style={{ fontSize: '0.65rem', color: '#334155', marginTop: '6px' }}>
+            Affiché : <span style={{ color: '#22d3ee' }}>{identite}</span>
+          </div>
+        )}
+      </Section>
+
+      {/* ─── RÔLE ─── */}
       <Section label="Rôle">
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {ROLES.map(r => (
@@ -32,6 +99,7 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         </div>
       </Section>
 
+      {/* ─── ÉCHELON ─── */}
       <Section label="Échelon">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {LEVELS.map(l => (
@@ -40,25 +108,56 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         </div>
       </Section>
 
+      {/* ─── CONTRAT ─── */}
+      <Section label="Contrat">
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.6rem', color: '#334155', marginBottom: '4px' }}>Date d'embauche</div>
+            <input
+              type="date"
+              value={profile.dateEmbauche || ''}
+              onChange={e => onUpdateProfile({ dateEmbauche: e.target.value })}
+              style={inputStyle}
+            />
+            {anciennete && (
+              <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: '4px' }}>
+                Ancienneté : <span style={{ color: '#94a3b8' }}>{anciennete}</span>
+              </div>
+            )}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.6rem', color: '#334155', marginBottom: '4px' }}>Heures/semaine</div>
+            <input
+              type="number"
+              placeholder="35"
+              min={20}
+              max={48}
+              value={profile.heuresContrat || ''}
+              onChange={e => onUpdateProfile({ heuresContrat: parseInt(e.target.value) || undefined })}
+              style={{ ...inputStyle, textAlign: 'center' }}
+            />
+          </div>
+        </div>
+      </Section>
+
+      {/* ─── DATE CYCLE ─── */}
       <Section label="Date de début de cycle">
         <input
           type="date"
           value={profile.rootDate}
           onChange={e => onUpdateProfile({ rootDate: e.target.value })}
-          style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '8px', padding: '10px 12px', color: '#f1f5f9',
-            fontSize: '0.9rem', width: '100%', boxSizing: 'border-box',
-          }}
+          style={inputStyle}
         />
       </Section>
 
+      {/* ─── DONNÉES ─── */}
       <Section label="Données">
         <div style={{ color: '#475569', fontSize: '0.85rem' }}>
           {shiftsCount} journée{shiftsCount > 1 ? 's' : ''} enregistrée{shiftsCount > 1 ? 's' : ''}
         </div>
       </Section>
 
+      {/* ─── RESET ─── */}
       <Section label="Réinitialisation">
         {confirmReset ? (
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -79,6 +178,7 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         )}
       </Section>
 
+      {/* ─── QR UPSWIPE ─── */}
       <div style={{
         marginTop: '40px', padding: '20px', borderRadius: '16px',
         background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
@@ -87,14 +187,24 @@ export const ProfilView: React.FC<ProfilViewProps> = ({ profile, shiftsCount, on
         <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Envie de changement ?
         </div>
-        <img src={QR_CAPSO} alt="CAPSO" style={{ width: '96px', height: '96px', borderRadius: '8px' }} />
-        <div style={{ fontSize: '0.72rem', color: '#475569', textAlign: 'center', lineHeight: 1.4 }}>
-          
-          <span style={{ color: '#22d3ee', fontWeight: 700 }}>Rejoins Upswipe !</span>
+        <img src={QR_CAPSO} alt="Upswipe" style={{ width: '96px', height: '96px', borderRadius: '8px' }} />
+        <div style={{ fontSize: '0.72rem', color: '#22d3ee', fontWeight: 700 }}>
+          Rejoins Upswipe !
         </div>
       </div>
     </div>
   );
+};
+
+const inputStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: '8px',
+  padding: '10px 12px',
+  color: '#f1f5f9',
+  fontSize: '0.9rem',
+  width: '100%',
+  boxSizing: 'border-box',
 };
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
